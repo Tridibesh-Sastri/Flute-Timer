@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Build Outputs
+dist/
+build/
+out/
+
+# Logs
+logs/
+*.log
+
+# Editor Environment
+.vscode/
+
+# Python Helpers
+*.py
+
+# Temp Files
+tmp/
+temp/
+.tmp/
+*.tmp
+.DS_Store
+Thumbs.db

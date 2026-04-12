@@ -1,0 +1,5 @@
+- Initialized Electron window.
+- Connected microphone input.
+- Formatted Minimal UI.
+- Integrated Silence Duration threshold logic.
+- Implemented Session Timer Feature, independent of audio logic.

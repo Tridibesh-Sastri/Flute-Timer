@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="header">
+    <div class="drag-handle">Flute Timer</div>
+    <div class="controls-wrapper">
+      <button id="min-btn">➖</button>
+      <button id="expand-btn">🔲</button>
+      <button id="close-btn">❌</button>
+    </div>
+  </div>
+  
+  <div id="timer-display">00:00:00</div>
+  <div id="status-indicator">Listening...</div>
+  <div id="session-container">
+    <div id="session-timer-display">00:00:00</div>
+    <button id="session-toggle-btn">Start Session (S)</button>
+  </div>
+
+  
+  <div id="entry-logs"></div>
+
+  <script src="../components/timer.js"></script>
+  <script src="../components/windowControls.js"></script>
+  <script src="audio.js"></script>
+  <script src="../components/sessionTimer.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

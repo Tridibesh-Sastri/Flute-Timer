@@ -1,0 +1,2 @@
+- Used RMS instead of peak detection because it is more stable against anomalies.
+- Implemented session timer entirely decoupled from the audio context context to prevent state pollution.

@@ -1,0 +1,1 @@
+- Setup future frequency-based note detection algorithms in pipeline.

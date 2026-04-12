@@ -1,0 +1,1 @@
+- Background noise triggers false detection when volume threshold approaches mic's ambient floor limits.
