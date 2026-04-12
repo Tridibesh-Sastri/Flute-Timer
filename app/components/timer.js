@@ -40,28 +40,5 @@ function stopTimerDisplay() {
   document.getElementById('timer-display').textContent = '00:00:00';
   startTime = 0;
   
-  return finalTimeStr;
-}
-
-function addLogEntry(durationStr) {
-  const div = document.createElement('div');
-  div.className = 'log-entry';
-  
-  const timeSpan = document.createElement('span');
-  timeSpan.className = 'log-time';
-  timeSpan.textContent = durationStr;
-  
-  const input = document.createElement('input');
-  input.className = 'log-label';
-  input.type = 'text';
-  input.placeholder = 'Label (e.g. Sa)';
-  
-  div.appendChild(timeSpan);
-  div.appendChild(input);
-  
-  const logsContainer = document.getElementById('entry-logs');
-  logsContainer.appendChild(div);
-  
-  // auto scroll to bottom
-  logsContainer.scrollTop = logsContainer.scrollHeight;
+  return { finalTimeStr, elapsed };
 }

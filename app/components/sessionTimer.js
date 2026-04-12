@@ -1,4 +1,7 @@
-let isSessionActive = false;
+window.isSessionActive = false;
+window.currentSession = null;
+window.sessions = JSON.parse(localStorage.getItem('sessions')) || [];
+
 let sessionStartTime = 0;
 let sessionDuration = 0;
 let sessionAnimationFrame = null;
@@ -11,28 +14,80 @@ function updateSessionDisplay() {
 
 function toggleSession() {
   const btn = document.getElementById('session-toggle-btn');
-  if (!isSessionActive) {
+  if (!window.isSessionActive) {
     // Start
-    isSessionActive = true;
+    window.isSessionActive = true;
     sessionStartTime = Date.now();
+    window.currentSession = {
+        id: crypto.randomUUID(),
+        startTime: new Date(sessionStartTime).toISOString(),
+        endTime: null,
+        duration: 0,
+        notes: []
+    };
     btn.textContent = 'Stop Session (S)';
     updateSessionDisplay();
   } else {
     // Stop
-    isSessionActive = false;
+    if (window.isRecording && typeof window.onStopRecording === 'function') {
+        window.onStopRecording();
+    }
+    
+    window.isSessionActive = false;
     cancelAnimationFrame(sessionAnimationFrame);
     const elapsed = Date.now() - sessionStartTime;
-    const finalStr = formatElapsed(elapsed);
+    
+    window.currentSession.endTime = new Date().toISOString();
+    window.currentSession.duration = elapsed;
+    window.sessions.push(window.currentSession);
+    localStorage.setItem('sessions', JSON.stringify(window.sessions));
+    window.currentSession = null;
+    
     sessionDuration += elapsed;
     
     document.getElementById('session-timer-display').textContent = '00:00:00';
     btn.textContent = 'Start Session (S)';
     
-    // Fallback/log entry directly into main list marking distinction
-    if (typeof addLogEntry === 'function') {
-      addLogEntry(`[Session End: ${finalStr}]`);
-    }
+    window.renderSessionList();
   }
+}
+
+window.renderSessionList = function() {
+    const container = document.getElementById('entry-logs');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    window.sessions.forEach(session => {
+        const el = document.createElement('div');
+        el.className = 'session-entry';
+        el.innerText = `Session ${session.id.substring(0,8)} | Notes: ${session.notes.length} | Dur: ${session.duration}ms`;
+        container.appendChild(el);
+        
+        session.notes.forEach(note => {
+            const nEl = document.createElement('div');
+            nEl.className = 'note-entry';
+            nEl.style.paddingLeft = '20px';
+            nEl.innerText = `└─ Note | Dur: ${note.duration}ms`;
+            container.appendChild(nEl);
+        });
+    });
+    
+    if (window.currentSession) {
+        const el = document.createElement('div');
+        el.className = 'session-entry current-session';
+        el.innerText = `Live Session | Notes: ${window.currentSession.notes.length} | Dur: Tracking...`;
+        container.appendChild(el);
+        
+        window.currentSession.notes.forEach(note => {
+            const nEl = document.createElement('div');
+            nEl.className = 'note-entry';
+            nEl.style.paddingLeft = '20px';
+            nEl.innerText = `└─ Note | Dur: ${note.duration}ms`;
+            container.appendChild(nEl);
+        });
+    }
+    
+    container.scrollTop = container.scrollHeight;
 }
 
 function setupSessionFeature() {
@@ -48,3 +103,4 @@ function setupSessionFeature() {
     }
   });
 }
+window.renderSessionList();

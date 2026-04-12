@@ -9,6 +9,8 @@ let analyser = null;
 let dataArray = null;
 let reqFrame = null;
 
+window.isRecording = false;
+
 async function setupAudio() {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
@@ -40,6 +42,7 @@ function calculateRMS(data) {
 }
 
 function onStartRecording() {
+  window.isRecording = true;
   isRecording = true;
   document.getElementById('status-indicator').textContent = 'Recording...';
   document.getElementById('status-indicator').className = 'status-recording';
@@ -47,14 +50,29 @@ function onStartRecording() {
 }
 
 function onStopRecording() {
+  window.isRecording = false;
   isRecording = false;
   document.getElementById('status-indicator').textContent = 'Listening...';
   document.getElementById('status-indicator').className = 'status-listening';
-  const durationStr = stopTimerDisplay();
-  addLogEntry(durationStr);
+  
+  const { finalTimeStr, elapsed } = stopTimerDisplay();
+  
+  if (window.currentSession) {
+    window.currentSession.notes.push({
+      startTime: new Date(Date.now() - elapsed).toISOString(),
+      duration: elapsed
+    });
+    window.renderSessionList();
+  }
 }
+window.onStopRecording = onStopRecording;
 
 function processAudio() {
+  reqFrame = requestAnimationFrame(processAudio);
+  if (!window.isSessionActive) {
+      return; 
+  }
+  
   analyser.getByteTimeDomainData(dataArray);
   const rms = calculateRMS(dataArray);
   
@@ -78,7 +96,7 @@ function processAudio() {
     silenceStartTime = 0;
   }
   
-  reqFrame = requestAnimationFrame(processAudio);
+  
 }
 
 window.setupAudio = setupAudio;
