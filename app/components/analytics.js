@@ -2,13 +2,27 @@
 // Called by dashboard.js: window.renderAnalytics(containerId, sessions)
 
 function msToStr(ms) {
-  if (!ms || ms <= 0) return '—';
+  if (!ms || ms <= 0) return '0s';
   const s = Math.floor(ms / 1000);
   const m = Math.floor(s / 60);
   const h = Math.floor(m / 60);
   if (h > 0) return `${h}h ${m % 60}m`;
   if (m > 0) return `${m}m ${s % 60}s`;
   return `${s}s`;
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function getSessionActiveDuration(session) {
+  if (!session || !Array.isArray(session.notes)) return 0;
+  return session.notes.reduce((sum, note) => sum + Math.max(0, Number(note.duration) || 0), 0);
 }
 
 function calculateStreak(sessions) {
@@ -61,12 +75,53 @@ function buildBarRows(rows, maxValue, labelFmt, valueFmt) {
   }).join('');
 }
 
+function buildComparisonRows(rows, maxDuration) {
+  const safeMax = Math.max(maxDuration, 1);
+  return rows.map(row => {
+    const sessionPct = Math.round((row.duration / safeMax) * 100);
+    const activePct = Math.min(Math.round((row.activeDuration / safeMax) * 100), sessionPct);
+    const gapPct = Math.max(sessionPct - activePct, 0);
+    const efficiency = row.duration > 0 ? Math.round((row.activeDuration / row.duration) * 100) : 0;
+
+    return `
+      <div class="comparison-row">
+        <div class="comparison-row-header">
+          <span class="comparison-label">${escapeHtml(row.label)}</span>
+          <span class="comparison-meta">${msToStr(row.duration)} total · ${msToStr(row.activeDuration)} active · ${msToStr(row.gapDuration)} gap · ${efficiency}% active</span>
+        </div>
+        <div class="comparison-track">
+          <div class="comparison-fill-active" style="width: ${activePct}%"></div>
+          <div class="comparison-fill-gap" style="width: ${gapPct}%"></div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
 window.renderAnalytics = function(containerId, sessions) {
   const container = document.getElementById(containerId);
   if (!container) return;
   sessions = sessions || JSON.parse(localStorage.getItem('sessions')) || [];
 
+  const sessionMetrics = sessions.map((session, index) => {
+    const duration = session.duration || 0;
+    const activeDuration = getSessionActiveDuration(session);
+    const gapDuration = Math.max(duration - activeDuration, 0);
+    const noteCount = Array.isArray(session.notes) ? session.notes.length : 0;
+    const name = session.name || `Session #${index + 1}`;
+    return {
+      session,
+      index,
+      duration,
+      activeDuration,
+      gapDuration,
+      noteCount,
+      label: name
+    };
+  });
+
   let totalDuration = 0;
+  let totalActiveDuration = 0;
+  let totalGapDuration = 0;
   let totalNotes = 0;
   let totalNoteDuration = 0;
   let longestNote = 0;
@@ -74,12 +129,13 @@ window.renderAnalytics = function(containerId, sessions) {
   let mostNotesSession = 0;
   const dayMap = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
 
-  sessions.forEach((session) => {
-    const duration = session.duration || 0;
+  sessionMetrics.forEach((metric) => {
+    const { session, duration, activeDuration, gapDuration } = metric;
     totalDuration += duration;
+    totalActiveDuration += activeDuration;
+    totalGapDuration += gapDuration;
 
-    const noteCount = Array.isArray(session.notes) ? session.notes.length : 0;
-    if (noteCount > mostNotesSession) mostNotesSession = noteCount;
+    if (metric.noteCount > mostNotesSession) mostNotesSession = metric.noteCount;
 
     if (Array.isArray(session.notes)) {
       session.notes.forEach((note) => {
@@ -101,25 +157,30 @@ window.renderAnalytics = function(containerId, sessions) {
   const totalSessions = sessions.length;
   const avgSession = totalSessions > 0 ? Math.round(totalDuration / totalSessions) : 0;
   const avgNote = totalNotes > 0 ? Math.round(totalNoteDuration / totalNotes) : 0;
+  const efficiency = totalDuration > 0 ? Math.round((totalActiveDuration / totalDuration) * 100) : 0;
   const streak = calculateStreak(sessions);
   const shortestNoteDisplay = Number.isFinite(shortestNote) ? shortestNote : 0;
 
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const weekdayRows = dayNames.map((name, idx) => ({ label: name, value: dayMap[idx] || 0 }));
 
-  const recent = sessions.slice(-7).map((session) => ({
-    duration: session.duration || 0,
-    noteCount: Array.isArray(session.notes) ? session.notes.length : 0
-  }));
+  const recent = sessionMetrics.slice(-7);
 
   const durationRows = recent.map((row, idx) => ({
-    label: `S${Math.max(1, totalSessions - recent.length + idx + 1)}`,
+    label: row.label || `S${Math.max(1, totalSessions - recent.length + idx + 1)}`,
     value: row.duration
   }));
 
   const noteRows = recent.map((row, idx) => ({
-    label: `S${Math.max(1, totalSessions - recent.length + idx + 1)}`,
+    label: row.label || `S${Math.max(1, totalSessions - recent.length + idx + 1)}`,
     value: row.noteCount
+  }));
+
+  const comparisonRows = recent.map((row, idx) => ({
+    label: row.label || `S${Math.max(1, totalSessions - recent.length + idx + 1)}`,
+    duration: row.duration,
+    activeDuration: row.activeDuration,
+    gapDuration: row.gapDuration
   }));
 
   const weekdayBars = buildBarRows(
@@ -143,6 +204,11 @@ window.renderAnalytics = function(containerId, sessions) {
     row => String(row.value)
   );
 
+  const comparisonBars = buildComparisonRows(
+    comparisonRows,
+    Math.max(...comparisonRows.map(row => row.duration), 1)
+  );
+
   container.innerHTML = `
     <div class="cards-row">
       <div class="stat-card">
@@ -151,15 +217,15 @@ window.renderAnalytics = function(containerId, sessions) {
       </div>
       <div class="stat-card">
         <div class="stat-value">${msToStr(totalDuration)}</div>
-        <div class="stat-label">Total Practice</div>
+        <div class="stat-label">Total Session Duration</div>
       </div>
       <div class="stat-card">
-        <div class="stat-value">${msToStr(avgSession)}</div>
-        <div class="stat-label">Avg Session</div>
+        <div class="stat-value">${msToStr(totalActiveDuration)}</div>
+        <div class="stat-label">Total Active Note Duration</div>
       </div>
-      <div class="stat-card ${streak >= 2 ? 'card-highlight' : ''}">
-        <div class="stat-value">${streak}</div>
-        <div class="stat-label">Practice Streak</div>
+      <div class="stat-card">
+        <div class="stat-value">${msToStr(totalGapDuration)}</div>
+        <div class="stat-label">Total Gap Time</div>
       </div>
     </div>
 
@@ -169,9 +235,20 @@ window.renderAnalytics = function(containerId, sessions) {
         <div class="stat-label">Total Notes</div>
       </div>
       <div class="stat-card">
+        <div class="stat-value">${msToStr(avgSession)}</div>
+        <div class="stat-label">Avg Session</div>
+      </div>
+      <div class="stat-card">
         <div class="stat-value">${msToStr(avgNote)}</div>
         <div class="stat-label">Avg Note Duration</div>
       </div>
+      <div class="stat-card ${streak >= 2 ? 'card-highlight' : ''}">
+        <div class="stat-value">${streak}</div>
+        <div class="stat-label">Practice Streak</div>
+      </div>
+    </div>
+
+    <div class="cards-row">
       <div class="stat-card">
         <div class="stat-value">${msToStr(longestNote)}</div>
         <div class="stat-label">Longest Note</div>
@@ -179,6 +256,21 @@ window.renderAnalytics = function(containerId, sessions) {
       <div class="stat-card">
         <div class="stat-value">${msToStr(shortestNoteDisplay)}</div>
         <div class="stat-label">Shortest Note</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">${mostNotesSession}</div>
+        <div class="stat-label">Most Notes in One Session</div>
+      </div>
+      <div class="stat-card ${efficiency >= 70 ? 'card-highlight' : ''}">
+        <div class="stat-value">${efficiency}%</div>
+        <div class="stat-label">Practice Efficiency</div>
+      </div>
+    </div>
+
+    <div class="comparison-section">
+      <div class="chart-title">Session Duration vs Active Note Time (Recent)</div>
+      <div class="comparison-list">
+        ${comparisonBars || '<div class="cal-timeline-empty">No session comparisons available yet.</div>'}
       </div>
     </div>
 

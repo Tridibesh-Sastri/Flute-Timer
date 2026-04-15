@@ -63,7 +63,10 @@ function onStopRecording() {
   if (window.currentSession) {
     window.currentSession.notes.push({
       startTime: new Date(Date.now() - elapsed).toISOString(),
-      duration: elapsed
+      duration: elapsed,
+      label: '',
+      description: '',
+      tags: []
     });
     if (window.onNoteComplete) {
       window.onNoteComplete();

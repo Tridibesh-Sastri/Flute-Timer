@@ -6,7 +6,10 @@
 
 body {
   font-family: 'Inter', 'Segoe UI', sans-serif;
-  background: #0d0d0d;
+  background:
+    radial-gradient(1200px circle at top left, rgba(0, 188, 212, 0.08), transparent 36%),
+    radial-gradient(900px circle at bottom right, rgba(0, 188, 212, 0.05), transparent 34%),
+    #0b0d10;
   color: #e0e0e0;
   height: 100vh;
   display: flex;
@@ -29,6 +32,13 @@ body {
   height: 42px;
 }
 
+.dash-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  -webkit-app-region: no-drag;
+}
+
 .drag-handle {
   font-size: 12px;
   color: #555;
@@ -39,6 +49,24 @@ body {
   display: flex;
   gap: 4px;
   -webkit-app-region: no-drag;
+}
+
+#dash-widget-btn {
+  background: rgba(0, 188, 212, 0.12);
+  color: #8be8f5;
+  border: 1px solid rgba(0, 188, 212, 0.28);
+  border-radius: 6px;
+  cursor: pointer;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-family: inherit;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+
+#dash-widget-btn:hover {
+  background: rgba(0, 188, 212, 0.2);
+  border-color: rgba(0, 188, 212, 0.45);
+  color: #d4f8fc;
 }
 
 .dash-controls button {
@@ -121,7 +149,7 @@ body {
 /* ─────────────────────── Analytics Cards ─────────────────────── */
 .cards-row {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 12px;
   margin-bottom: 14px;
 }
@@ -230,6 +258,128 @@ body {
   font-size: 14px;
   margin-top: 80px;
   line-height: 1.8;
+}
+
+/* ─────────────────────── Settings + Comparison ─────────────────────── */
+.settings-shell {
+  display: grid;
+  gap: 16px;
+}
+
+.settings-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid #1e1e1e;
+  border-radius: 12px;
+  padding: 18px;
+}
+
+.settings-card-heading {
+  font-size: 14px;
+  font-weight: 600;
+  color: #f2f2f2;
+  margin-bottom: 8px;
+}
+
+.settings-card-copy {
+  font-size: 12px;
+  line-height: 1.65;
+  color: #8a8a8a;
+}
+
+.settings-slider-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.settings-slider-label {
+  font-size: 10px;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-weight: 600;
+}
+
+.settings-slider-value {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: #00bcd4;
+  font-weight: 600;
+}
+
+#floating-opacity-slider {
+  width: 100%;
+  margin-top: 10px;
+  accent-color: #00bcd4;
+}
+
+.settings-hint {
+  margin-top: 10px;
+  font-size: 11px;
+  color: #5a5a5a;
+}
+
+.comparison-section {
+  margin-top: 20px;
+  padding: 18px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid #1e1e1e;
+  border-radius: 10px;
+}
+
+.comparison-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.comparison-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.comparison-row-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 14px;
+}
+
+.comparison-label {
+  font-size: 12px;
+  color: #dedede;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.comparison-meta {
+  font-size: 11px;
+  color: #666;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.comparison-track {
+  display: flex;
+  height: 12px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.comparison-fill-active {
+  background: linear-gradient(90deg, #00bcd4, #45e4f4);
+  min-width: 2px;
+}
+
+.comparison-fill-gap {
+  background: rgba(255, 255, 255, 0.16);
+  min-width: 2px;
 }
 
 /* ─────────────────────── Calendar ─────────────────────── */
@@ -363,6 +513,16 @@ body {
   padding: 16px;
   overflow-y: auto;
   max-height: 440px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cal-side-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
 }
 
 .cal-side-empty {
@@ -377,9 +537,74 @@ body {
   font-size: 13px;
   font-weight: 600;
   color: #ccc;
-  margin-bottom: 12px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #1e1e1e;
+  margin-bottom: 4px;
+}
+
+.cal-side-subtitle {
+  font-size: 11px;
+  color: #666;
+  line-height: 1.4;
+}
+
+.cal-zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.cal-zoom-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid #2a2a2a;
+  color: #888;
+  border-radius: 6px;
+  padding: 4px 9px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+  font-family: inherit;
+}
+
+.cal-zoom-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ddd;
+  border-color: #363636;
+}
+
+.cal-zoom-value {
+  min-width: 42px;
+  text-align: center;
+  font-size: 11px;
+  color: #666;
+  font-variant-numeric: tabular-nums;
+}
+
+.cal-day-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.cal-day-summary-item {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid #1b1b1b;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.cal-day-summary-item span {
+  display: block;
+  font-size: 10px;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-bottom: 4px;
+}
+
+.cal-day-summary-item strong {
+  color: #ddd;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
 }
 
 .cal-session-item {
@@ -402,6 +627,10 @@ body {
   font-size: 11px;
   color: #555;
   font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 8px;
 }
 
 .cal-timeline-wrap {
@@ -450,6 +679,9 @@ body {
   color: #dff9fd;
   overflow: hidden;
   border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .cal-time-block-name {
@@ -479,107 +711,234 @@ body {
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid #1e1e1e;
   border-radius: 10px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
   overflow: hidden;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, background 0.2s;
 }
 
 .session-card:hover {
-  border-color: #2d2d2d;
+  border-color: #2e2e2e;
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .session-card-header {
   padding: 14px 16px;
   display: flex;
-  align-items: center;
-  gap: 12px;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.session-expand-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid #2a2a2a;
+  color: #888;
+  border-radius: 6px;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  font-size: 12px;
+  font-family: inherit;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.session-expand-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #d9d9d9;
+  border-color: #383838;
+}
+
+.session-card-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .session-name-input {
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid transparent;
+  border-radius: 6px;
   color: #ddd;
   font-size: 14px;
   font-weight: 500;
   font-family: inherit;
-  flex: 1;
   outline: none;
-  transition: border-color 0.2s, color 0.2s;
-  padding: 2px 0;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+  padding: 8px 10px;
   -webkit-app-region: no-drag;
 }
 
 .session-name-input:hover {
-  border-bottom-color: #333;
+  border-color: #2f2f2f;
 }
 
 .session-name-input:focus {
-  border-bottom-color: #00bcd4;
+  border-color: #00bcd4;
   color: #fff;
+  background: rgba(0, 0, 0, 0.2);
 }
 
 .session-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 12px;
   font-size: 11px;
-  color: #505050;
-  flex-shrink: 0;
+  color: #5c5c5c;
   font-variant-numeric: tabular-nums;
+  line-height: 1.4;
 }
 
-.session-notes-drawer {
-  padding: 0 16px 12px;
+.session-card-meta span {
+  white-space: nowrap;
 }
 
-.session-notes-drawer summary {
-  font-size: 11px;
-  color: #555;
-  cursor: pointer;
-  user-select: none;
-  padding: 6px 0;
-  list-style: none;
-  transition: color 0.2s;
-  letter-spacing: 0.3px;
+.session-card-body {
+  display: none;
+  padding: 0 16px 16px 46px;
+  border-top: 1px solid #191919;
 }
 
-.session-notes-drawer summary:hover {
-  color: #aaa;
+.session-card.is-expanded .session-card-body {
+  display: block;
+}
+
+.session-detail-stats {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.session-detail-stat {
+  display: flex;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid #1b1b1b;
+  border-radius: 8px;
+  padding: 10px 12px;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.session-detail-stat span {
+  font-size: 10px;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.session-detail-stat strong {
+  font-size: 12px;
+  color: #ddd;
+  font-variant-numeric: tabular-nums;
 }
 
 .session-notes-list {
-  margin-top: 8px;
+  margin-top: 14px;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 12px;
 }
 
 .session-note-row {
-  display: flex;
-  gap: 10px;
-  align-items: baseline;
-  font-size: 12px;
-  padding: 7px 10px;
   background: rgba(255, 255, 255, 0.02);
-  border-radius: 6px;
+  border: 1px solid #1b1b1b;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
-.note-label {
-  color: #bbb;
-  font-weight: 500;
+.session-note-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
 }
 
-.note-dur {
-  color: #00bcd4;
+.session-note-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #ddd;
+}
+
+.session-note-meta {
+  font-size: 11px;
+  color: #666;
   font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 
-.note-desc {
-  color: #555;
-  font-style: italic;
-  flex: 1;
+.session-note-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.session-note-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.session-note-field span {
+  font-size: 10px;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.session-note-field input,
+.session-note-field textarea {
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid #343434;
+  color: #eee;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-family: inherit;
+  transition: border-color 0.2s, background 0.2s;
+  outline: none;
+}
+
+.session-note-field input:focus,
+.session-note-field textarea:focus {
+  border-color: #00bcd4;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.session-note-field textarea {
+  resize: vertical;
+  min-height: 76px;
+}
+
+.session-note-field-wide {
+  grid-column: 1 / -1;
+}
+
+.session-note-input {
+  width: 100%;
 }
 
 .no-notes {
   font-size: 11px;
   color: #3a3a3a;
   padding: 6px 0;
+}
+
+@media (max-width: 860px) {
+  .session-detail-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .session-note-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .session-note-field-wide {
+    grid-column: auto;
+  }
 }

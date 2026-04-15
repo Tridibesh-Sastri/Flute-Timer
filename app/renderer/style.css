@@ -184,11 +184,14 @@ body {
   border-radius: 6px;
   display: flex;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 10px;
   user-select: none;
   font-weight: 500;
   transition: background 0.2s ease;
   font-size: 13px;
   letter-spacing: 0.5px;
+  line-height: 1.4;
 }
 .session-header:hover {
   background: rgba(255, 255, 255, 0.15);
@@ -240,6 +243,7 @@ body {
   font-family: inherit;
   transition: border-color 0.2s, background 0.2s;
   outline: none;
+  width: 100%;
 }
 .note-inputs input:focus, .note-inputs textarea:focus {
     border-color: #00bcd4;

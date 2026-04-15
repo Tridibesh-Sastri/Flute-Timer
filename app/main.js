@@ -1,10 +1,64 @@
 const { app, BrowserWindow, ipcMain, screen } = require('electron');
+const fs = require('fs');
 const path = require('path');
 
 let floatingWidget = null;
 let dashboardWindow = null;
+let appSettings = { floatingOpacity: 1 };
+
+function getSettingsPath() {
+  return path.join(app.getPath('userData'), 'flute-timer-settings.json');
+}
+
+function clampOpacity(value) {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) return 1;
+  return Math.min(1, Math.max(0.35, numericValue));
+}
+
+function loadSettings() {
+  try {
+    const raw = fs.readFileSync(getSettingsPath(), 'utf8');
+    const parsed = JSON.parse(raw);
+    return {
+      floatingOpacity: clampOpacity(parsed.floatingOpacity)
+    };
+  } catch (err) {
+    return { floatingOpacity: 1 };
+  }
+}
+
+function saveSettings() {
+  try {
+    fs.writeFileSync(getSettingsPath(), JSON.stringify(appSettings, null, 2));
+  } catch (err) {
+    console.error('Unable to save settings:', err);
+  }
+}
+
+function focusWindow(win) {
+  if (!win || win.isDestroyed()) return;
+  if (win.isMinimized()) win.restore();
+  win.show();
+  win.focus();
+}
+
+function setFloatingOpacity(value) {
+  const nextOpacity = clampOpacity(value);
+  appSettings.floatingOpacity = nextOpacity;
+  saveSettings();
+  if (floatingWidget && !floatingWidget.isDestroyed()) {
+    floatingWidget.setOpacity(nextOpacity);
+  }
+  return nextOpacity;
+}
 
 function createFloatingWidget() {
+  if (floatingWidget && !floatingWidget.isDestroyed()) {
+    focusWindow(floatingWidget);
+    return floatingWidget;
+  }
+
   const { width } = screen.getPrimaryDisplay().workAreaSize;
   floatingWidget = new BrowserWindow({
     width: 320,
@@ -15,6 +69,7 @@ function createFloatingWidget() {
     frame: false,
     alwaysOnTop: true,
     resizable: true,
+    opacity: appSettings.floatingOpacity,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -22,10 +77,17 @@ function createFloatingWidget() {
     }
   });
   floatingWidget.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+  floatingWidget.setOpacity(appSettings.floatingOpacity);
   floatingWidget.on('closed', () => { floatingWidget = null; });
+  return floatingWidget;
 }
 
 function createDashboard() {
+  if (dashboardWindow && !dashboardWindow.isDestroyed()) {
+    focusWindow(dashboardWindow);
+    return dashboardWindow;
+  }
+
   dashboardWindow = new BrowserWindow({
     width: 920,
     height: 660,
@@ -43,18 +105,26 @@ function createDashboard() {
   });
   dashboardWindow.loadFile(path.join(__dirname, 'dashboard', 'dashboard.html'));
   dashboardWindow.on('closed', () => { dashboardWindow = null; });
+  return dashboardWindow;
 }
 
 app.whenReady().then(() => {
+  appSettings = loadSettings();
   createFloatingWidget();
 
   // Dashboard window management
   ipcMain.on('open-dashboard', () => {
-    if (dashboardWindow) {
-      dashboardWindow.focus();
-    } else {
-      createDashboard();
-    }
+    if (dashboardWindow) focusWindow(dashboardWindow);
+    else createDashboard();
+  });
+
+  ipcMain.on('open-floating', () => {
+    if (floatingWidget) focusWindow(floatingWidget);
+    else createFloatingWidget();
+  });
+
+  ipcMain.on('set-floating-opacity', (_event, value) => {
+    setFloatingOpacity(value);
   });
 
   // Forward refresh signal to dashboard when session ends

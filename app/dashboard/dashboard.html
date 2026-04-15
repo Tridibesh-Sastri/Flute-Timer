@@ -14,10 +14,13 @@
   <!-- Custom title bar -->
   <div class="dash-header">
     <span class="drag-handle">🎵 Flute Timer — Dashboard</span>
-    <div class="dash-controls">
+    <div class="dash-actions">
+      <button id="dash-widget-btn" title="Open Floating Widget">Widget</button>
+      <div class="dash-controls">
       <button id="dash-min-btn" title="Minimize">─</button>
       <button id="dash-max-btn" title="Maximize">□</button>
       <button id="dash-close-btn" title="Close">✕</button>
+      </div>
     </div>
   </div>
 
@@ -26,12 +29,14 @@
     <button class="tab-btn active" data-tab="panel-summary">📊 Summary</button>
     <button class="tab-btn" data-tab="panel-calendar">📅 Calendar</button>
     <button class="tab-btn" data-tab="panel-sessions">📋 Sessions</button>
+    <button class="tab-btn" data-tab="panel-settings">⚙ Settings</button>
   </nav>
 
   <!-- Tab Panels -->
   <div id="panel-summary" class="tab-panel active"></div>
   <div id="panel-calendar" class="tab-panel"></div>
   <div id="panel-sessions" class="tab-panel"></div>
+  <div id="panel-settings" class="tab-panel"></div>
 
   <script src="../components/analytics.js"></script>
   <script src="../components/calendar.js"></script>

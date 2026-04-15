@@ -7,6 +7,7 @@
   let _year = new Date().getFullYear();
   let _month = new Date().getMonth();
   let _selectedDay = null;
+  let _timelineZoom = 1;
 
   const MONTHS = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -32,6 +33,20 @@
     if (h > 0) return `${h}h ${m % 60}m`;
     if (m > 0) return `${m}m ${s % 60}s`;
     return `${s}s`;
+  }
+
+  function getSessionActiveDuration(session) {
+    if (!session || !Array.isArray(session.notes)) return 0;
+    return session.notes.reduce((sum, note) => sum + Math.max(0, Number(note.duration) || 0), 0);
+  }
+
+  function clampZoom(value) {
+    return Math.min(2.5, Math.max(0.5, value));
+  }
+
+  function updateZoom(delta) {
+    _timelineZoom = clampZoom(Math.round((_timelineZoom + delta) * 100) / 100);
+    renderGrid();
   }
 
   function timeLabel(date) {
@@ -81,6 +96,7 @@
       name: session.name || `Session #${index + 1}`,
       notes: Array.isArray(session.notes) ? session.notes.length : 0,
       duration: session.duration || 0,
+      activeDuration: getSessionActiveDuration(session),
       originalStart: start,
       originalEnd: end,
       startMin,
@@ -132,9 +148,10 @@
   }
 
   function buildTimelineHtml(daySessions, dayStart, dayEnd) {
-    const timelineHeight = 640;
+    const timelineHeight = Math.round(640 * _timelineZoom);
     const dayMinutes = 24 * 60;
     const pxPerMinute = timelineHeight / dayMinutes;
+    const hourStep = _timelineZoom >= 1.5 ? 1 : 2;
 
     const windows = daySessions
       .map((session, idx) => getSessionWindowForDay(session, dayStart, dayEnd, idx))
@@ -147,7 +164,7 @@
     const positioned = assignOverlapLanes(windows);
 
     const hourLines = [];
-    for (let h = 0; h <= 24; h += 2) {
+    for (let h = 0; h <= 24; h += hourStep) {
       const top = Math.round(h * 60 * pxPerMinute);
       const hourLabel = `${String(h).padStart(2, '0')}:00`;
       hourLines.push(`
@@ -187,11 +204,6 @@
     const panel = document.getElementById('cal-side-panel');
     if (!panel) return;
 
-    if (!daySessions || !daySessions.length) {
-      panel.innerHTML = '<div class="cal-side-empty">No sessions on this day.</div>';
-      return;
-    }
-
     const dayStart = new Date(_year, _month, day, 0, 0, 0, 0);
     const dayEnd = new Date(_year, _month, day + 1, 0, 0, 0, 0);
 
@@ -201,27 +213,62 @@
       return at - bt;
     });
 
+    const totalDuration = sorted.reduce((sum, session) => sum + Math.max(0, Number(session.duration) || 0), 0);
+    const totalActiveDuration = sorted.reduce((sum, session) => sum + getSessionActiveDuration(session), 0);
+    const totalGapDuration = Math.max(totalDuration - totalActiveDuration, 0);
+
     const items = sorted.map((session, i) => {
       const name = escapeHtml(session.name || `Session #${i + 1}`);
       const start = session.startTime ? new Date(session.startTime) : null;
       const end = session.endTime ? new Date(session.endTime) : new Date((start ? start.getTime() : Date.now()) + (session.duration || 0));
       const range = start ? `${timeLabel(start)} - ${timeLabel(end)}` : '—';
       const dur = msToStr(session.duration || 0);
+      const active = msToStr(getSessionActiveDuration(session));
+      const gap = msToStr(Math.max((session.duration || 0) - getSessionActiveDuration(session), 0));
       const notes = Array.isArray(session.notes) ? session.notes.length : 0;
       return `
         <div class="cal-session-item">
           <div class="cal-session-name">${name}</div>
-          <div class="cal-session-meta">${range} · ${dur} · ${notes} note${notes !== 1 ? 's' : ''}</div>
+          <div class="cal-session-meta">${range} · ${dur} total · ${active} active · ${gap} gap · ${notes} note${notes !== 1 ? 's' : ''}</div>
         </div>`;
     }).join('');
 
     const dateLabel = `${MONTHS_SHORT[_month]} ${day}, ${_year}`;
     const timeline = buildTimelineHtml(sorted, dayStart, dayEnd);
+    const hasSessions = sorted.length > 0;
 
     panel.innerHTML = `
-      <div class="cal-side-title">${dateLabel}</div>
-      ${items}
-      ${timeline}
+      <div class="cal-side-header">
+        <div>
+          <div class="cal-side-title">${dateLabel}</div>
+          <div class="cal-side-subtitle">${hasSessions ? `${sorted.length} sessions · ${msToStr(totalDuration)} total · ${msToStr(totalActiveDuration)} active` : 'No sessions recorded on this day'}</div>
+        </div>
+        <div class="cal-zoom-controls">
+          <button class="cal-zoom-btn" id="cal-zoom-out" title="Zoom out">−</button>
+          <span class="cal-zoom-value">${Math.round(_timelineZoom * 100)}%</span>
+          <button class="cal-zoom-btn" id="cal-zoom-in" title="Zoom in">+</button>
+        </div>
+      </div>
+      <div class="cal-day-summary">
+        <div class="cal-day-summary-item">
+          <span>Sessions</span>
+          <strong>${sorted.length}</strong>
+        </div>
+        <div class="cal-day-summary-item">
+          <span>Total</span>
+          <strong>${msToStr(totalDuration)}</strong>
+        </div>
+        <div class="cal-day-summary-item">
+          <span>Active</span>
+          <strong>${msToStr(totalActiveDuration)}</strong>
+        </div>
+        <div class="cal-day-summary-item">
+          <span>Gap</span>
+          <strong>${msToStr(totalGapDuration)}</strong>
+        </div>
+      </div>
+      ${hasSessions ? items : '<div class="cal-side-empty">No sessions on this day.</div>'}
+      ${hasSessions ? timeline : '<div class="cal-timeline-empty">No timed sessions to plot.</div>'}
     `;
   }
 
@@ -303,8 +350,18 @@
       });
     });
 
-    if (_selectedDay && dateMap[_selectedDay]) {
-      renderSidePanel(dateMap[_selectedDay], _selectedDay);
+    if (_selectedDay !== null) {
+      renderSidePanel(dateMap[_selectedDay] || [], _selectedDay);
+      const zoomOutButton = document.getElementById('cal-zoom-out');
+      const zoomInButton = document.getElementById('cal-zoom-in');
+
+      if (zoomOutButton) {
+        zoomOutButton.addEventListener('click', () => updateZoom(-0.25));
+      }
+
+      if (zoomInButton) {
+        zoomInButton.addEventListener('click', () => updateZoom(0.25));
+      }
     }
   }
 

@@ -8,6 +8,34 @@ let sessionStartTime = 0;
 let sessionDuration = 0;
 let sessionAnimationFrame = null;
 
+function msToStr(ms) {
+    if (!ms || ms <= 0) return '0s';
+    const s = Math.floor(ms / 1000);
+    const m = Math.floor(s / 60);
+    const h = Math.floor(m / 60);
+    if (h > 0) return `${h}h ${m % 60}m ${s % 60}s`;
+    if (m > 0) return `${m}m ${s % 60}s`;
+    return `${s}s`;
+}
+
+function parseTags(value) {
+    return String(value || '')
+        .split(',')
+        .map((tag) => tag.trim())
+        .filter(Boolean);
+}
+
+function normalizeTags(tags) {
+    if (Array.isArray(tags)) return tags.map((tag) => String(tag).trim()).filter(Boolean);
+    if (typeof tags === 'string') return parseTags(tags);
+    return [];
+}
+
+function getSessionActiveDuration(session) {
+    if (!session || !Array.isArray(session.notes)) return 0;
+    return session.notes.reduce((sum, note) => sum + Math.max(0, Number(note.duration) || 0), 0);
+}
+
 function updateSessionDisplay() {
   const elapsed = Date.now() - sessionStartTime;
   document.getElementById('session-timer-display').textContent = formatElapsed(elapsed);
@@ -73,7 +101,9 @@ function createNoteDOM(note, isLive, sIndex, nIndex) {
     
     const info = document.createElement('div');
     info.className = 'note-info';
-    info.innerText = `└─ Note | Dur: ${note.duration}ms`;
+    const noteStart = note.startTime ? new Date(note.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+    const noteDuration = note.duration || 0;
+    info.innerText = `└─ Note | Start: ${noteStart} | Dur: ${msToStr(noteDuration)} (${noteDuration}ms)`;
     
     const inputs = document.createElement('div');
     inputs.className = 'note-inputs';
@@ -85,6 +115,14 @@ function createNoteDOM(note, isLive, sIndex, nIndex) {
     lbl.dataset.sessionIndex = sIndex;
     lbl.dataset.noteIndex = nIndex;
     lbl.dataset.inputType = 'label';
+
+    const tags = document.createElement('input');
+    tags.type = 'text';
+    tags.placeholder = 'Tags (comma-separated)';
+    tags.value = normalizeTags(note.tags).join(', ');
+    tags.dataset.sessionIndex = sIndex;
+    tags.dataset.noteIndex = nIndex;
+    tags.dataset.inputType = 'tags';
     
     const desc = document.createElement('textarea');
     desc.placeholder = 'Description...';
@@ -96,15 +134,19 @@ function createNoteDOM(note, isLive, sIndex, nIndex) {
     const saveChanges = () => {
         window.sessions[sIndex].notes[nIndex].label = lbl.value;
         window.sessions[sIndex].notes[nIndex].description = desc.value;
+        window.sessions[sIndex].notes[nIndex].tags = parseTags(tags.value);
         localStorage.setItem('sessions', JSON.stringify(window.sessions));
     };
     
     lbl.addEventListener('change', saveChanges);
+    tags.addEventListener('change', saveChanges);
     desc.addEventListener('change', saveChanges);
     lbl.addEventListener('keyup', () => { note.label = lbl.value; });
+    tags.addEventListener('keyup', () => { note.tags = parseTags(tags.value); });
     desc.addEventListener('keyup', () => { note.description = desc.value; });
     
     inputs.appendChild(lbl);
+    inputs.appendChild(tags);
     inputs.appendChild(desc);
     
     nEl.appendChild(info);
@@ -116,18 +158,21 @@ function createSessionDOM(session, sIndex, isLive) {
     const el = document.createElement('div');
     el.className = 'session-entry' + (isLive ? ' current-session' : '');
     if (isLive) el.id = 'live-session-container';
+    const sessionKey = session.id || `session-${sIndex}`;
     
     const header = document.createElement('div');
     header.className = 'session-header';
     const idStr = isLive ? 'Live Session' : (session.name || (`Session #${sIndex + 1}`));
     const durStr = session.endTime ? session.duration + 'ms' : 'Tracking...';
-    header.innerText = `${idStr} | Notes: ${session.notes.length} | Dur: ${durStr}`;
+    const activeStr = msToStr(getSessionActiveDuration(session));
+    const noteCount = Array.isArray(session.notes) ? session.notes.length : 0;
+    header.innerText = `${idStr} | Notes: ${noteCount} | Dur: ${durStr} | Active: ${activeStr}`;
     if (isLive) header.id = 'live-session-header';
     
     const notesContainer = document.createElement('div');
     notesContainer.className = 'session-notes';
     
-    const isExpanded = isLive || window.expandedSessionIds.has(session.id);
+    const isExpanded = isLive || window.expandedSessionIds.has(sessionKey);
     if (isExpanded) {
         notesContainer.classList.add('expanded');
     }
@@ -138,15 +183,17 @@ function createSessionDOM(session, sIndex, isLive) {
     header.addEventListener('click', () => {
         const currentlyExpanded = notesContainer.classList.toggle('expanded');
         if (currentlyExpanded) {
-            window.expandedSessionIds.add(session.id);
+            window.expandedSessionIds.add(sessionKey);
         } else {
-            window.expandedSessionIds.delete(session.id);
+            window.expandedSessionIds.delete(sessionKey);
         }
     });
     
-    session.notes.forEach((note, nIndex) => {
-        notesContainer.appendChild(createNoteDOM(note, isLive, sIndex, nIndex));
-    });
+    if (Array.isArray(session.notes)) {
+        session.notes.forEach((note, nIndex) => {
+            notesContainer.appendChild(createNoteDOM(note, isLive, sIndex, nIndex));
+        });
+    }
     
     el.appendChild(header);
     el.appendChild(notesContainer);
