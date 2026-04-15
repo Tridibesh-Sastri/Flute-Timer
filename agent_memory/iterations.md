@@ -261,3 +261,235 @@ Changes Made: Added a live IPC-fed FFT visualizer in the dashboard with a dedica
 Errors: None
 Fix Applied: N/A
 Result: Success
+
+
+[Iteration 22]
+Command: Phase 4.4 Specification Upgrade - Advanced Audio Visualization & Fundamental Detection
+Files Modified:
+- spec/04_logic.md
+- spec/06_audio_rules.md
+- spec/08_data_model.md
+- spec/09_analytics.md
+- spec/11_audio_visualization.md
+Changes Made: Extended the specification layer to define spectrogram and waveform visualization, HPS-based fundamental detection, frame reuse and spectrogram buffer limits, transient debug-only frequency fields, and placeholder analytics for fundamental stability and harmonic richness. Preserved the existing spectrum and harmonic visualization rules without replacing them.
+Errors: None
+Fix Applied: N/A
+Result: Success
+
+
+[Iteration 23]
+Command: Phase 4.4 Skills Upgrade - Advanced Audio Visualization & Fundamental Detection
+Files Modified:
+- skills/01_audio_system.md
+- skills/08_pitch_detection.md
+- skills/12_spectrogram_rendering.md
+- skills/13_waveform_rendering.md
+- skills/14_hps_detection.md
+- skills/15_visualizer_optimization.md
+Changes Made: Added shared frame reuse rules to the audio system skill, switched pitch detection to HPS-first routing, and created new skills for spectrogram rendering, waveform rendering, HPS detection, and visualizer optimization. Kept the existing spectrum and harmonic layers additive.
+Errors: None
+Fix Applied: N/A
+Result: Success
+
+
+[Iteration 24]
+Command: Phase 4.4 Tasks Upgrade - Advanced Audio Visualization & HPS
+Files Modified:
+- tasks/11_audio_visualization.md
+Changes Made: Created the Phase 4.4 execution plan for shared FFT buffer access, HPS-first frequency routing, spectrogram rendering, waveform rendering, visualizer integration, and memory guardrails while preserving the existing spectrum and harmonic display.
+Errors: None
+Fix Applied: N/A
+Result: Success
+
+
+[Iteration 25]
+Command: Phase 4.4 Implementation Step 1 - Shared Frame Extraction
+Files Modified:
+- app/renderer/audio.js
+Changes Made: Reused the existing analyser and live byte buffers for time-domain and frequency capture, keeping frame extraction ephemeral and frame-size bounded.
+Errors: None
+Fix Applied: N/A
+Result: Success
+
+
+[Iteration 26]
+Command: Phase 4.4 Implementation Step 2 - HPS Implementation
+Files Modified:
+- app/renderer/audio.js
+Changes Made: Added HPS-first frequency detection from the current FFT frame using /2, /3, and /4 downsampling while preserving the raw FFT peak only for debug comparison.
+Errors: None
+Fix Applied: N/A
+Result: Success
+
+
+[Iteration 27]
+Command: Phase 4.4 Implementation Step 3 - Frame Packaging
+Files Modified:
+- app/renderer/audio.js
+Changes Made: Extended the IPC visualizer payload with spectrumData, waveformData, rawFrequency, hpsFrequency, selectedFrequency, and timestamp fields.
+Errors: None
+Fix Applied: N/A
+Result: Success
+
+
+[Iteration 28]
+Command: Phase 4.4 Implementation Step 4 - Spectrogram Buffer
+Files Modified:
+- app/components/visualizer.js
+Changes Made: Added a bounded rolling spectrogram buffer and live frame ingestion keyed to the dashboard spectrum payload.
+Errors: None
+Fix Applied: N/A
+Result: Success
+
+
+[Iteration 29]
+Command: Phase 4.4 Implementation Step 5 - Spectrogram Rendering
+Files Modified:
+- app/components/visualizer.js
+- app/dashboard/dashboard.css
+Changes Made: Rendered the rolling spectrogram as a time-frequency canvas layer with amplitude color mapping while keeping the existing FFT spectrum and harmonics intact.
+Errors: None
+Fix Applied: N/A
+Result: Success
+
+
+[Iteration 30]
+Command: Phase 4.4 Implementation Step 6 - Waveform Rendering
+Files Modified:
+- app/components/visualizer.js
+- app/renderer/audio.js
+Changes Made: Added current-frame waveform transport and rendering with normalized amplitude and no long-term history.
+Errors: None
+Fix Applied: N/A
+Result: Success
+
+
+[Iteration 31]
+Command: Phase 4.4 Implementation Step 7 - HPS Overlay
+Files Modified:
+- app/components/visualizer.js
+Changes Made: Drew the HPS-selected frequency as the authoritative marker on the spectrum and spectrogram views.
+Errors: None
+Fix Applied: N/A
+Result: Success
+
+
+[Iteration 32]
+Command: Phase 4.4 Implementation Step 8 - Dashboard Integration
+Files Modified:
+- app/dashboard/dashboard.js
+- app/dashboard/dashboard.html
+- app/dashboard/dashboard.css
+- app/components/visualizer.js
+Changes Made: Added the spectrogram and waveform sections to the dashboard visualizer panel while preserving the existing FFT spectrum flow.
+Errors: None
+Fix Applied: N/A
+Result: Success
+
+
+[Iteration 33]
+Command: Phase 4.4 Implementation Step 9 - Debug Panel
+Files Modified:
+- app/components/visualizer.js
+- app/dashboard/dashboard.css
+Changes Made: Exposed raw FFT peak, HPS frequency, final selected frequency, note label, confidence, and frame-state details in the dashboard debug surface.
+Errors: None
+Fix Applied: N/A
+Result: Success
+
+
+[Iteration 34]
+Command: Phase 4.4 Implementation Step 10 - Performance Optimization
+Files Modified:
+- app/renderer/audio.js
+- app/components/visualizer.js
+- app/dashboard/dashboard.js
+Changes Made: Kept rendering throttled, reused buffers and canvas contexts, and bounded live visualization history to the active session.
+Errors: None
+Fix Applied: N/A
+Result: Success
+
+
+[Iteration 35]
+Command: Phase 4.4 Implementation Step 11 - Final System Test
+Files Modified:
+- none
+Changes Made: Ran `npm start` from the project root and confirmed Electron launched without startup syntax/runtime errors. Interactive microphone-driven note and long-session scenarios were not fully automated in this environment.
+Errors: None
+Fix Applied: N/A
+Result: Partial Success / Startup Verified
+
+
+[Iteration 36]
+Command: Phase 4.4 Stabilization & Validation
+Files Modified:
+- app/renderer/audio.js
+- app/components/visualizer.js
+- app/dashboard/dashboard.js
+- app/dashboard/dashboard.html
+- app/dashboard/dashboard.css
+Changes Made: Verified the visualizer module structure, IPC frame flow, spectrogram rendering path, waveform rendering path, and debug panel bindings. Fixed the HPS product scaling so it multiplies raw spectral amplitudes instead of normalized values, which keeps the HPS confidence signal numerically meaningful. Confirmed the dashboard and renderer JS files are error-free and Electron starts cleanly after the stabilization pass.
+Issues Found: HPS multiplication was too damped when based on normalized bins; this risked weakening the final HPS confidence signal.
+Fix Applied: Switched HPS multiplication to raw byte spectral amplitudes while keeping the raw FFT peak as debug-only comparison data.
+Result: Stable / Startup Verified; interactive long-session and live microphone behavior still require manual runtime observation.
+
+
+[Iteration 37]
+Command: Phase 4.4 Roadmap Update
+Files Modified:
+- v002roadmap.txt
+Changes Made: Marked Phase 4.4 as completed in the master roadmap, added the spectrogram/waveform/HPS phase entry, and updated the current position block so the roadmap now reflects Phase 4.4 completion with Phase 5 as the next phase.
+Issues Found: None
+Fix Applied: N/A
+Result: Success
+
+
+[Iteration 38]
+Command: Phase 5 Specification Upgrade - Psychoacoustic Audio Intelligence with MFCC
+Files Modified:
+- spec/12_psychoacoustic_intelligence.md
+- spec/04_logic.md
+- spec/06_audio_rules.md
+- spec/08_data_model.md
+- spec/09_analytics.md
+Changes Made: Added the psychoacoustic note-extraction specification with MFCC, logarithmic MIDI-based note mapping, temporal smoothing, note segmentation, and stable note timeline output. Extended the core logic, audio rules, data model, and analytics docs to treat MFCC as an additive frame-based layer that reuses the existing FFT/HPS pipeline and remains compatible with future comparison and learning systems.
+Issues Found: None
+Fix Applied: N/A
+Result: Success
+
+
+[Iteration 39]
+Command: Phase 5 Specification Tune - Note Segmentation Window
+Files Modified:
+- spec/12_psychoacoustic_intelligence.md
+Changes Made: Tightened the psychoacoustic note segmentation rules so the stability window must cover at least 3 frames and typically fall in the 80 ms to 150 ms range.
+Issues Found: None
+Fix Applied: N/A
+Result: Success
+
+
+[Iteration 40]
+Command: Phase 5 Skills Upgrade - Psychoacoustic Audio Intelligence with MFCC
+Files Modified:
+- skills/01_audio_system.md
+- skills/04_data_system.md
+- skills/16_mfcc_extraction.md
+- skills/17_note_mapping.md
+- skills/18_pitch_binning.md
+- skills/19_temporal_smoothing.md
+- skills/20_note_segmentation.md
+- skills/21_noise_rejection.md
+Changes Made: Added the psychoacoustic frame chain to the audio system skill, added transient psychoacoustic frame fields to the data system skill, and created dedicated skill modules for MFCC extraction, note mapping, pitch binning, temporal smoothing, note segmentation, and noise rejection. Kept the existing FFT, HPS, spectrogram, waveform, and session rules additive.
+Issues Found: None
+Fix Applied: N/A
+Result: Success
+
+
+[Iteration 41]
+Command: Phase 5 Tasks Upgrade - Psychoacoustic Audio Intelligence with MFCC
+Files Modified:
+- tasks/12_psychoacoustic_intelligence.md
+Changes Made: Created the ordered Phase 5 execution plan covering MFCC extraction, frequency-to-MIDI mapping, pitch binning, temporal smoothing, noise rejection, note segmentation, note timeline buffering, integration with the existing audio loop, debug output, performance guardrails, and final validation. Preserved the existing FFT, HPS, spectrogram, and visualizer systems as additive dependencies only.
+Issues Found: None
+Fix Applied: N/A
+Result: Success

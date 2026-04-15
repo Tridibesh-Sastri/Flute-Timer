@@ -75,7 +75,6 @@ function initTabs() {
     });
   });
 }
-
 function renderSettingsTab() {
   const panel = document.getElementById('panel-settings');
   if (!panel) return;
@@ -355,6 +354,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (api && api.onVisualizerFrame) {
     api.onVisualizerFrame((frame) => {
+      window.latestDashboardVisualizerFrame = frame || null;
       if (typeof window.updateVisualizerFrame === 'function') {
         window.updateVisualizerFrame(frame);
       }

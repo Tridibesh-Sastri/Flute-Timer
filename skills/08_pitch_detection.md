@@ -31,34 +31,35 @@ Maintains the live analyser frame as a single reusable input source for pitch cl
 
 ---
 
-## Sub-Skill: Frequency Calculation Method
+## Sub-Skill: HPS Fundamental Selection
 
 ### 1. Purpose
-Derives one deterministic frequency candidate from the strongest valid spectral peak.
+Derives the primary frequency candidate from the current FFT frame using Harmonic Product Spectrum, not the raw FFT peak.
 
 ### 2. APIs / Concepts Used
 - spectral magnitude bins
-- 80 Hz to 4000 Hz search band
-- quadratic interpolation around a local peak
+- Harmonic Product Spectrum (HPS)
+- reusable FFT and scratch buffers
 
 ### 3. Step-by-Step Implementation
-1. Convert the valid frequency band into low and high analyser bins.
-2. Find the bin with the highest magnitude inside that band.
-3. If both neighboring bins exist, refine the peak using quadratic interpolation around the local maximum.
-4. Convert the refined bin to Hertz using the analyser sample rate and FFT size.
-5. Reject any non-finite or unstable interpolation result.
-6. Reject any frequency outside the valid pitch range.
+1. Read the current reusable FFT magnitude buffer from the live analyser frame.
+2. Preserve the raw FFT peak only as `debugFrequencyRaw` for visual comparison.
+3. Pass the same spectrum into the HPS detector and treat the HPS result as the primary `frequencyHz` candidate.
+4. Emit `debugFrequencyHPS` and `debugConfidence` alongside the primary frequency.
+5. Forward the HPS-derived frequency to note mapping and note tracking.
+6. If HPS is unavailable for the frame, keep the last valid primary frequency for the current session state and do not manufacture a new note label.
 
 ### 4. Inputs / Outputs
-- **Inputs**: magnitude spectrum, sample rate, FFT size.
-- **Outputs**: one `frequencyHz` candidate or no result.
+- **Inputs**: magnitude spectrum, sample rate, FFT size, and HPS output.
+- **Outputs**: one primary `frequencyHz` candidate plus live-only debug values.
 
 ### 5. Edge Cases
-- Equal peak magnitudes: choose the lower-frequency bin first.
-- Band edge peak: skip interpolation and use the center bin frequency.
+- Equal raw FFT peak magnitudes: choose the lower-frequency bin first for `debugFrequencyRaw` only.
+- Missing HPS result: do not promote raw FFT peak to the primary frequency.
 
 ### 6. Constraints
-- The same frame sequence must produce the same frequency output.
+- The same frame sequence must produce the same primary HPS frequency output.
+- Raw FFT peak remains auxiliary debug data only.
 
 ---
 
@@ -74,8 +75,8 @@ Removes frames that should not contribute to pitch intelligence.
 
 ### 3. Step-by-Step Implementation
 1. Reject any frame with `pitchConfidence < 0.35`.
-2. Reject any frame with no dominant spectral peak.
-3. Reject any frame outside the 80 Hz to 4000 Hz pitch band.
+2. Reject any frame with no HPS-derived fundamental candidate.
+3. Reject any HPS frequency outside the valid pitch range.
 4. Reject any frame classified as breath-dominant.
 5. Preserve the last valid pitch result when the current frame is rejected.
 
@@ -102,8 +103,8 @@ Produces a deterministic numeric confidence for each pitch frame.
 - ratio calculation
 
 ### 3. Step-by-Step Implementation
-1. Measure the highest magnitude inside the valid pitch band as `peakMagnitude`.
-2. Measure the sum of all magnitudes inside the valid pitch band as `totalMagnitude`.
+1. Measure the highest HPS magnitude inside the valid pitch band as `peakMagnitude`.
+2. Measure the sum of all HPS magnitudes inside the valid pitch band as `totalMagnitude`.
 3. Calculate `pitchConfidence = peakMagnitude / max(totalMagnitude, 1)`.
 4. Treat the frame as valid only when `pitchConfidence >= 0.35`.
 5. Clamp any non-finite result to 0.

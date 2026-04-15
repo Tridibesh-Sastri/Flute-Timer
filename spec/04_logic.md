@@ -41,6 +41,34 @@
 - Pitch metadata must be accumulated only during the active note window.
 - Session end must force-close any active note and finalize its pitch aggregates using the same rules as a normal silence closure.
 
+## Visualization Update Pipeline
+- While the Session is active, each processed analyser frame must also update the live waveform, FFT spectrum, and spectrogram surfaces.
+- The spectrogram must append one time slice per frame and discard the oldest slice when the rolling buffer limit is reached.
+- Visualization updates may be throttled for rendering, but they must use the most recent analyser frame and must never block audio processing.
+- Existing spectrum and harmonic overlays must remain visible and continue to reflect the same live frame.
+
+## Fundamental Tracking Pipeline
+- After the FFT spectrum is captured for a frame, the audio loop must compute HPS from the same frame using fixed downsample factors of 2, 3, and 4.
+- The fundamental candidate derived from HPS must be tracked separately from the raw FFT peak.
+- The visualizer and debug surfaces must surface `debugFrequencyRaw`, `debugFrequencyHPS`, and `debugConfidence` as live-only diagnostic values.
+- The final displayed fundamental must prefer HPS output, while raw FFT peak data remains auxiliary debug information.
+- HPS computation must not alter Session timing, NoteEvent timing, or note persistence rules.
+
+## Psychoacoustic Processing Layer
+- The psychoacoustic layer runs after HPS and uses the same live analyser frame; it must not request a second capture or separate audio pipeline.
+- The processing order is:
+
+```text
+FFT Frame → HPS frequency → MFCC coefficients → Note mapping → Smoothed output
+```
+
+- MFCC values must be derived from the FFT magnitudes already captured for the frame and must remain frame-based.
+- The mapping stage must convert the HPS frequency into a continuous MIDI value and then quantize it to the nearest stable note bin.
+- A note candidate becomes valid only after it survives the temporal smoothing window and the note-stability window.
+- Short spikes and low-confidence MFCC patterns must be discarded before note segmentation.
+- The output of this layer is a stable note candidate and note timeline segment that can feed future extraction and comparison systems.
+- Psychoacoustic processing must not mutate Session timing, existing NoteEvent timing, or the existing FFT/HPS visualizers.
+
 ## Dominant Note Calculation
 - Each valid pitch frame must be mapped to a note label using the formula in [spec/10_audio_intelligence.md](spec/10_audio_intelligence.md).
 - `dominantNote` is the mapped note label with the highest frame count within the note.

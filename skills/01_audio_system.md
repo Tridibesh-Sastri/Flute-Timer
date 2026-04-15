@@ -255,3 +255,128 @@ Prevents redundant pitch work and guarantees one classification pass per animati
 ### 6. Constraints
 - No background polling.
 - No multiple queued classification frames.
+
+---
+
+## Sub-Skill: Shared Frame Reuse Rules
+
+### 1. Purpose
+Ensures the live analyser frame is captured once and reused by pitch, waveform, spectrogram, and HPS consumers without extra allocations.
+
+### 2. APIs / Concepts Used
+- `AnalyserNode`
+- reusable time-domain and frequency-domain buffers
+- session-active state
+
+### 3. Step-by-Step Implementation
+1. Allocate the analyser buffers when the Session becomes active.
+2. Reuse the same time-domain frame buffer for every live sample.
+3. Reuse the same FFT magnitude buffer for every live spectral consumer.
+4. Capture the analyser frame once per animation frame and share the snapshot with downstream processing.
+5. Clear the shared frame state only when the Session ends.
+
+### 4. Inputs / Outputs
+- **Inputs**: active session state and current analyser instance.
+- **Outputs**: shared frame snapshot for pitch, waveform, spectrogram, and HPS processing.
+
+### 5. Edge Cases
+- Session stops mid-frame: keep the current shared buffers alive until the frame completes, then stop reusing them.
+- Missing analyser: skip all consumers for that frame.
+
+### 6. Constraints
+- No per-frame buffer allocation.
+- No separate frame copies for each consumer unless a renderer explicitly needs a transient draw snapshot.
+
+---
+
+## Sub-Skill: Shared FFT Buffer Usage
+
+### 1. Purpose
+Provides a single FFT magnitude source for spectrum display, HPS detection, and spectrogram extraction.
+
+### 2. APIs / Concepts Used
+- `AnalyserNode.getFloatFrequencyData()`
+- preallocated floating-point spectrum buffer
+- shared live-frame state
+
+### 3. Step-by-Step Implementation
+1. Allocate one FFT buffer sized to `analyser.frequencyBinCount`.
+2. Fill the buffer once from the current analyser frame.
+3. Read the same buffer from the spectrum display, HPS detector, and spectrogram extractor.
+4. Keep auxiliary scratch arrays separate from the live FFT buffer.
+5. Never mutate the live FFT buffer inside downstream consumers.
+
+### 4. Inputs / Outputs
+- **Inputs**: one live analyser spectral frame.
+- **Outputs**: shared magnitude data for all spectral consumers.
+
+### 5. Edge Cases
+- Sample rate changes: reinitialize the shared FFT buffer only when the analyser is rebuilt.
+- Low-energy frame: keep the buffer valid even when the magnitude values are near the noise floor.
+
+### 6. Constraints
+- No duplicated FFT storage per consumer.
+- No unbounded spectral history in memory.
+
+---
+
+## Sub-Skill: Spectrogram Frame Extraction
+
+### 1. Purpose
+Transforms each shared FFT frame into a single spectrogram column for the live visualizer.
+
+### 2. APIs / Concepts Used
+- FFT magnitude buffer
+- rolling spectrogram column buffer
+- frequency-bin to frequency-axis mapping
+
+### 3. Step-by-Step Implementation
+1. Read the current shared FFT magnitude buffer.
+2. Clamp the usable bins to the 0 Hz to approximately 4000 Hz visual range.
+3. Normalize each bin into a display intensity value.
+4. Store the normalized values as one spectrogram column.
+5. Append the new column to the rolling spectrogram buffer and overwrite the oldest column when full.
+6. Forward the column to the renderer without persisting it.
+
+### 4. Inputs / Outputs
+- **Inputs**: one live FFT magnitude frame.
+- **Outputs**: one time-stamped spectrogram column for live rendering.
+
+### 5. Edge Cases
+- Empty or low-energy frames: still advance the timeline with a low-intensity column.
+- Buffer full: discard the oldest column in FIFO order.
+
+### 6. Constraints
+- Spectrogram extraction must remain live-only.
+- The spectrogram buffer must stay bounded to the approved rolling window.
+
+---
+
+## Sub-Skill: Psychoacoustic Frame Chain
+
+### 1. Input
+- One live analyser snapshot, the shared FFT magnitude frame, the HPS result, and the current session timestamp.
+- Downstream consumers that need a stable psychoacoustic note candidate.
+
+### 2. Output
+- One shared psychoacoustic frame object containing MFCC coefficients, mapped note data, MIDI pitch data, and confidence metadata.
+- The same frame must feed note mapping, pitch binning, temporal smoothing, segmentation, and noise rejection.
+
+### 3. Step-by-Step Logic
+1. Capture the live analyser frame once for the current animation tick.
+2. Reuse the same FFT magnitude buffer that already feeds HPS and visualization.
+3. Run HPS first so the fundamental estimate remains available to the psychoacoustic layer.
+4. Feed the same FFT frame into MFCC extraction without allocating a second spectral pass.
+5. Attach the derived MFCC vector, mapped note candidate, MIDI value, and note confidence to the shared frame object.
+6. Publish the shared frame to the note pipeline, then clear it only when the session closes.
+
+### 4. Constraints
+- Do not allocate a second FFT buffer.
+- Do not create a separate audio pipeline for MFCC.
+- Keep MFCC additive to the existing FFT, HPS, spectrogram, waveform, and visualizer flow.
+- Keep all frame data live-only unless a later Session event finalizes it.
+
+### 5. Edge Cases
+- Low-energy frames still advance the pipeline, but they should carry low confidence.
+- If HPS fails on a frame, MFCC may still be computed, but downstream note output must not become unstable.
+- If the session stops mid-frame, finish the current frame and then clear the shared state.

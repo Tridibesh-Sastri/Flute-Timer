@@ -19,6 +19,8 @@ This file defines the strict mathematical metrics computed by the system.
 13. **Note distribution**: Count of `dominantNote` values inside the requested scope.
 14. **Most played note**: `dominantNote` value with the highest distribution count.
 15. **Frequency variance**: Variance of `avgFrequency` values inside the requested scope.
+16. **Fundamental stability**: Placeholder metric reserved for HPS-based consistency across the requested scope.
+17. **Harmonic richness**: Placeholder metric reserved for harmonic energy structure across the requested scope.
 
 ## Calendar Abstract Structure
 - Valid `Session` object definitions explicitly map into a valid calendar entity unit.
@@ -47,3 +49,10 @@ This file defines the strict mathematical metrics computed by the system.
 - Most played note ties are broken by higher cumulative note duration, then alphabetically ascending label.
 - Frequency variance is computed from `avgFrequency` values only; notes with `avgFrequency = 0` are excluded unless all notes are zero, in which case the result is `0`.
 - Breath-dominant notes are included in pitch stability as zero-valued notes if no valid pitch samples exist, but they are excluded from note distribution unless a dominant note is present.
+
+## Psychoacoustic Placeholder Metrics
+- Note distribution: placeholder metric for the distribution of stable psychoacoustic note labels across a scope.
+- Pitch stability: placeholder metric for the consistency of psychoacoustic note candidates across the smoothing window.
+- Note transition frequency: placeholder metric for the rate of stable note boundary changes per minute or per note timeline.
+- Average note duration: placeholder metric for the mean duration of stable psychoacoustic note segments.
+- These placeholders are reserved for the psychoacoustic layer defined in [spec/12_psychoacoustic_intelligence.md](spec/12_psychoacoustic_intelligence.md) and may be aligned with the existing session-note analytics once the new note timeline becomes authoritative.

@@ -82,3 +82,33 @@ Ensures that any user edit to a specific NoteEvent is immediately saved to local
 
 ### 6. Constraints
 - ALL edits must bypass generic `find` or `filter` replacements and strictly use direct pointer indexing to execute the immediate persistence rule successfully.
+
+---
+
+## Sub-Skill: Psychoacoustic Frame Fields
+
+### 1. Input
+- Live frame snapshots that contain FFT, HPS, MFCC, mapped note, MIDI value, and confidence metadata.
+- Session records that will store only finalized note events.
+
+### 2. Output
+- A frame-scoped analysis object with mfcc, mappedNote, midiValue, and noteConfidence fields.
+- A persisted Session note timeline that stores only finalized NoteEvent data.
+
+### 3. Step-by-Step Logic
+1. Keep MFCC coefficients on the live analysis frame, not in long-term storage.
+2. Derive mappedNote, midiValue, and noteConfidence from the current pitch and psychoacoustic state.
+3. Pass the frame-scoped values into smoothing, segmentation, and noise rejection.
+4. When a note becomes final, copy only the stable note summary into the Session note array.
+5. Clear transient psychoacoustic fields when the next frame arrives or the session closes.
+
+### 4. Constraints
+- Treat mfcc as transient frame data.
+- Treat mappedNote, midiValue, and noteConfidence as live-analysis values until segmentation finalizes them.
+- Keep the schema backward-compatible for sessions that do not have psychoacoustic fields.
+- Do not store raw frame history inside Session records.
+
+### 5. Edge Cases
+- Missing psychoacoustic fields must resolve safely when loading older sessions.
+- If a frame has no stable pitch, leave the mapped note fields empty instead of inventing values.
+- On partial saves or abrupt stop, finalized NoteEvent records must remain valid even if transient frame data is discarded.

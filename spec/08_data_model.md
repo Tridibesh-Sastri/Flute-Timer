@@ -37,3 +37,19 @@ This specification represents the universally exact boundaries of data schemas a
 - `label`: Standard editable system string mapping context definitions.
 - `description`: Standard editable system string mapping expanded user inputs.
 - `tags`: Editable array of short label strings, typically normalized from a comma-separated user input.
+- `debugFrequencyRaw`: Transient live-only raw FFT frequency candidate in Hz used for debug visualization. Must not be persisted.
+- `debugFrequencyHPS`: Transient live-only HPS-derived fundamental frequency in Hz used for debug visualization. Must not be persisted.
+- `debugConfidence`: Transient live-only confidence score for the current fundamental estimate. Must not be persisted.
+
+### Transient Psychoacoustic Frame Fields
+- `mfcc`: Frame-based array of MFCC coefficients used for psychoacoustic note validation. Must not be persisted.
+- `mappedNote`: Frame-based psychoacoustic note candidate string. Must not be persisted.
+- `midiValue`: Frame-based continuous MIDI value used before note quantization. Must not be persisted.
+- `noteConfidence`: Frame-based confidence score for the current psychoacoustic note candidate. Must not be persisted.
+- These fields may appear in live analysis snapshots, but serialization layers must omit them when writing Session or NoteEvent records to storage.
+- If historical records do not contain these fields, renderers should treat them as absent without mutating the stored data.
+
+### Transient Debug Field Rule
+- The debug frequency fields exist only for live visualization and debug surfaces.
+- Serialization layers must omit them when writing Session or NoteEvent records to storage.
+- If historical records do not contain these fields, renderers should treat them as absent without mutating the stored data.

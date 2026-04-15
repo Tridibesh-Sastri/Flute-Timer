@@ -19,7 +19,6 @@ let silenceStartTime = 0;
 let audioCtx = null;
 let analyser = null;
 let dataArray = null;
-let pitchFrameBuffer = null;
 let pitchSpectrumBuffer = null;
 let reqFrame = null;
 let lastPitchUiUpdateAt = 0;
@@ -58,8 +57,7 @@ async function setupAudio() {
     source.connect(analyser);
     
     dataArray = new Uint8Array(analyser.fftSize);
-    pitchFrameBuffer = new Float32Array(analyser.fftSize);
-    pitchSpectrumBuffer = new Float32Array(analyser.frequencyBinCount);
+    pitchSpectrumBuffer = new Uint8Array(analyser.frequencyBinCount);
     
     startAudioLoop();
   } catch (err) {
@@ -69,20 +67,20 @@ async function setupAudio() {
 }
 
 function captureAudioFrame() {
-  if (!analyser || !pitchFrameBuffer) return null;
-  analyser.getFloatTimeDomainData(pitchFrameBuffer);
-  return pitchFrameBuffer;
+  if (!analyser || !dataArray) return null;
+  analyser.getByteTimeDomainData(dataArray);
+  return dataArray;
 }
 
 function captureSpectrumFrame() {
   if (!analyser || !pitchSpectrumBuffer) return null;
-  analyser.getFloatFrequencyData(pitchSpectrumBuffer);
+  analyser.getByteFrequencyData(pitchSpectrumBuffer);
   return pitchSpectrumBuffer;
 }
 
 function getLinearMagnitude(dbValue) {
   if (!Number.isFinite(dbValue)) return 0;
-  return Math.pow(10, dbValue / 20);
+  return Math.max(0, dbValue) / 255;
 }
 
 function analyzePitchFrame(rms, minimumRms = window.START_THRESHOLD) {
@@ -101,9 +99,9 @@ function analyzePitchFrame(rms, minimumRms = window.START_THRESHOLD) {
 
   if (highBin < lowBin) return null;
 
-  let peakBin = -1;
-  let peakMagnitude = 0;
-  let totalMagnitude = 0;
+  let rawPeakBin = -1;
+  let rawPeakMagnitude = 0;
+  let rawTotalMagnitude = 0;
   let totalSpectrumMagnitude = 0;
   let breathBandMagnitude = 0;
   const breathLowBin = Math.max(1, Math.floor((BREATH_LOW_HZ * fftSize) / sampleRate));
@@ -114,10 +112,10 @@ function analyzePitchFrame(rms, minimumRms = window.START_THRESHOLD) {
     totalSpectrumMagnitude += magnitude;
 
     if (i >= lowBin && i <= highBin) {
-      totalMagnitude += magnitude;
-      if (magnitude > peakMagnitude) {
-        peakMagnitude = magnitude;
-        peakBin = i;
+      rawTotalMagnitude += magnitude;
+      if (magnitude > rawPeakMagnitude) {
+        rawPeakMagnitude = magnitude;
+        rawPeakBin = i;
       }
     }
 
@@ -126,29 +124,51 @@ function analyzePitchFrame(rms, minimumRms = window.START_THRESHOLD) {
     }
   }
 
-  if (peakBin < 0 || peakMagnitude <= 0) return null;
+  if (rawPeakBin < 0 || rawPeakMagnitude <= 0) return null;
 
-  let frequencyHz = (peakBin * sampleRate) / fftSize;
+  let rawFrequencyHz = (rawPeakBin * sampleRate) / fftSize;
 
-  if (peakBin > 0 && peakBin < binCount - 1) {
-    const leftMagnitude = getLinearMagnitude(pitchSpectrumBuffer[peakBin - 1]);
-    const centerMagnitude = peakMagnitude;
-    const rightMagnitude = getLinearMagnitude(pitchSpectrumBuffer[peakBin + 1]);
+  if (rawPeakBin > 0 && rawPeakBin < binCount - 1) {
+    const leftMagnitude = getLinearMagnitude(pitchSpectrumBuffer[rawPeakBin - 1]);
+    const centerMagnitude = rawPeakMagnitude;
+    const rightMagnitude = getLinearMagnitude(pitchSpectrumBuffer[rawPeakBin + 1]);
     const denominator = leftMagnitude - (2 * centerMagnitude) + rightMagnitude;
 
     if (Number.isFinite(denominator) && denominator !== 0) {
       const offset = 0.5 * (leftMagnitude - rightMagnitude) / denominator;
       if (Number.isFinite(offset)) {
-        const refinedBin = peakBin + Math.max(-1, Math.min(1, offset));
+        const refinedBin = rawPeakBin + Math.max(-1, Math.min(1, offset));
         const refinedFrequency = (refinedBin * sampleRate) / fftSize;
         if (Number.isFinite(refinedFrequency)) {
-          frequencyHz = refinedFrequency;
+          rawFrequencyHz = refinedFrequency;
         }
       }
     }
   }
 
-  const pitchConfidence = peakMagnitude / Math.max(totalMagnitude, 1);
+  const hpsHighBin = Math.min(highBin, Math.floor((binCount - 1) / 4));
+  let hpsPeakBin = -1;
+  let hpsPeakMagnitude = 0;
+  let hpsTotalMagnitude = 0;
+
+  for (let i = lowBin; i <= hpsHighBin; i++) {
+    const baseMagnitude = Math.max(0, pitchSpectrumBuffer[i]);
+    const magnitude2 = Math.max(0, pitchSpectrumBuffer[i * 2]);
+    const magnitude3 = Math.max(0, pitchSpectrumBuffer[i * 3]);
+    const magnitude4 = Math.max(0, pitchSpectrumBuffer[i * 4]);
+    const hpsMagnitude = baseMagnitude * magnitude2 * magnitude3 * magnitude4;
+
+    hpsTotalMagnitude += hpsMagnitude;
+    if (hpsMagnitude > hpsPeakMagnitude) {
+      hpsPeakMagnitude = hpsMagnitude;
+      hpsPeakBin = i;
+    }
+  }
+
+  if (hpsPeakBin < 0 || hpsPeakMagnitude <= 0) return null;
+
+  const frequencyHz = (hpsPeakBin * sampleRate) / fftSize;
+  const pitchConfidence = hpsPeakMagnitude / Math.max(hpsTotalMagnitude, 1);
   const breathScore = breathBandMagnitude / Math.max(totalSpectrumMagnitude, 1);
   const isBreathDominant = rms > window.STOP_THRESHOLD && pitchConfidence < MIN_PITCH_CONFIDENCE && breathScore >= BREATH_SCORE_THRESHOLD;
 
@@ -158,9 +178,12 @@ function analyzePitchFrame(rms, minimumRms = window.START_THRESHOLD) {
 
   return {
     frequencyHz,
+    rawFrequencyHz,
     pitchConfidence,
-    peakMagnitude,
-    totalMagnitude,
+    peakMagnitude: hpsPeakMagnitude,
+    totalMagnitude: hpsTotalMagnitude,
+    rawPeakMagnitude,
+    rawTotalMagnitude,
     breathScore,
     isBreathDominant
   };
@@ -219,16 +242,32 @@ function publishPitchReadout(pitchAnalysis) {
   }
 }
 
-function buildVisualizerFramePayload(rawPitchAnalysis, filteredPitchAnalysis, currentPitchAnalysis, isFrameRejected, spectrumBuffer) {
+function buildVisualizerFramePayload(rawPitchAnalysis, filteredPitchAnalysis, currentPitchAnalysis, isFrameRejected, spectrumBuffer, waveformBuffer) {
+  const rawFrequency = rawPitchAnalysis && Number.isFinite(rawPitchAnalysis.rawFrequencyHz)
+    ? rawPitchAnalysis.rawFrequencyHz
+    : null;
+  const hpsFrequency = rawPitchAnalysis && Number.isFinite(rawPitchAnalysis.frequencyHz)
+    ? rawPitchAnalysis.frequencyHz
+    : null;
+  const selectedFrequency = currentPitchAnalysis && Number.isFinite(currentPitchAnalysis.frequencyHz)
+    ? currentPitchAnalysis.frequencyHz
+    : (filteredPitchAnalysis && Number.isFinite(filteredPitchAnalysis.frequencyHz) ? filteredPitchAnalysis.frequencyHz : null);
+
   return {
     timestamp: performance.now(),
     sessionActive: window.isSessionActive,
     isRecording,
     sampleRate: audioCtx ? audioCtx.sampleRate : 0,
     fftSize: analyser ? analyser.fftSize : ANALYSER_FRAME_SIZE,
-    spectrumDb: spectrumBuffer ? spectrumBuffer.slice() : new Float32Array(0),
-    rawFrequencyHz: rawPitchAnalysis && Number.isFinite(rawPitchAnalysis.frequencyHz) ? rawPitchAnalysis.frequencyHz : null,
-    filteredFrequencyHz: filteredPitchAnalysis && Number.isFinite(filteredPitchAnalysis.frequencyHz) ? filteredPitchAnalysis.frequencyHz : null,
+    spectrumData: spectrumBuffer || null,
+    spectrumDb: spectrumBuffer || null,
+    waveformData: waveformBuffer || null,
+    rawFrequency,
+    hpsFrequency,
+    selectedFrequency,
+    rawFrequencyHz: rawFrequency,
+    hpsFrequencyHz: hpsFrequency,
+    filteredFrequencyHz: selectedFrequency,
     rawConfidence: rawPitchAnalysis && Number.isFinite(rawPitchAnalysis.pitchConfidence) ? rawPitchAnalysis.pitchConfidence : 0,
     filteredConfidence: filteredPitchAnalysis && Number.isFinite(filteredPitchAnalysis.pitchConfidence) ? filteredPitchAnalysis.pitchConfidence : 0,
     noteLabel: currentPitchAnalysis && currentPitchAnalysis.noteLabel ? currentPitchAnalysis.noteLabel : '',
@@ -242,14 +281,14 @@ function buildVisualizerFramePayload(rawPitchAnalysis, filteredPitchAnalysis, cu
   };
 }
 
-function publishVisualizerFrame(rawPitchAnalysis, filteredPitchAnalysis, currentPitchAnalysis, isFrameRejected, spectrumBuffer, force = false) {
+function publishVisualizerFrame(rawPitchAnalysis, filteredPitchAnalysis, currentPitchAnalysis, isFrameRejected, spectrumBuffer, waveformBuffer, force = false) {
   if (!window.electronAPI || typeof window.electronAPI.sendVisualizerFrame !== 'function') return;
 
   const now = performance.now();
   if (!force && (now - lastVisualizerFrameAt) < VISUALIZER_FRAME_MS) return;
 
   lastVisualizerFrameAt = now;
-  const payload = buildVisualizerFramePayload(rawPitchAnalysis, filteredPitchAnalysis, currentPitchAnalysis, isFrameRejected, spectrumBuffer);
+  const payload = buildVisualizerFramePayload(rawPitchAnalysis, filteredPitchAnalysis, currentPitchAnalysis, isFrameRejected, spectrumBuffer, waveformBuffer);
   window.latestVisualizerFrame = payload;
   window.electronAPI.sendVisualizerFrame(payload);
 }
@@ -262,7 +301,7 @@ function resetVisualizerFrameState() {
 
 function clearVisualizerFrame() {
   resetVisualizerFrameState();
-  publishVisualizerFrame(null, null, null, false, null, true);
+  publishVisualizerFrame(null, null, null, false, null, null, true);
 }
 
 function resetActivePitchTracking() {
@@ -428,7 +467,6 @@ function processAudio() {
   }
 
   captureAudioFrame();
-  analyser.getByteTimeDomainData(dataArray);
   const rms = calculateRMS(dataArray);
   captureSpectrumFrame();
   const pitchGate = isRecording ? window.STOP_THRESHOLD : window.START_THRESHOLD;
@@ -478,7 +516,7 @@ function processAudio() {
     recordActivePitchSample(currentPitchAnalysis);
   }
 
-  publishVisualizerFrame(rawPitchAnalysis, filteredPitchAnalysis, currentPitchAnalysis, frameRejected, pitchSpectrumBuffer);
+  publishVisualizerFrame(rawPitchAnalysis, filteredPitchAnalysis, currentPitchAnalysis, frameRejected, pitchSpectrumBuffer, dataArray);
 
   if (!window.isSessionActive) {
     return;

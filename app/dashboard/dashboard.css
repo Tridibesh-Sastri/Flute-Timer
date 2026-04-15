@@ -54,6 +54,10 @@ body {
 #dash-widget-btn {
   background: rgba(0, 188, 212, 0.12);
   color: #8be8f5;
+
+.visualizer-panel {
+  padding-bottom: 24px;
+}
   border: 1px solid rgba(0, 188, 212, 0.28);
   border-radius: 6px;
   cursor: pointer;
@@ -949,6 +953,10 @@ body {
   gap: 14px;
 }
 
+.visualizer-panel {
+  padding-bottom: 24px;
+}
+
 .visualizer-stage {
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid #1e1e1e;
@@ -992,10 +1000,27 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+.visualizer-status-muted {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #d0d5dd;
+}
+
 .visualizer-canvas {
   width: 100%;
-  height: 320px;
   display: block;
+}
+
+.visualizer-stage-spectrum .visualizer-canvas {
+  height: 320px;
+}
+
+.visualizer-stage-spectrogram .visualizer-canvas {
+  height: 240px;
+}
+
+.visualizer-stage-waveform .visualizer-canvas {
+  height: 180px;
 }
 
 .visualizer-axis-caption {
@@ -1067,8 +1092,16 @@ body {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .visualizer-canvas {
+  .visualizer-stage-spectrum .visualizer-canvas {
     height: 280px;
+  }
+
+  .visualizer-stage-spectrogram .visualizer-canvas {
+    height: 220px;
+  }
+
+  .visualizer-stage-waveform .visualizer-canvas {
+    height: 160px;
   }
 
   .visualizer-stage-header {

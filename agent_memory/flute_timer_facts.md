@@ -1,0 +1,27 @@
+- Stack: Electron desktop app with vanilla JS, dual-window model (floating widget + dashboard).
+- Entrypoint: flute-timer/app/main.js; secure preloads with contextIsolation true and nodeIntegration false.
+- Core data key: localStorage 'sessions' array of Session objects with nested NoteEvent entries.
+- Session gating: audio detection only processes when window.isSessionActive is true.
+- Audio logic: RMS-based hysteresis (START 0.02, STOP 0.01, 300ms silence delay), adjustable via slider.
+- Renderer modules: app/renderer/audio.js + app/components/{timer,sessionTimer,analytics,calendar}.js.
+- Dashboard refresh path: widget sends 'dashboard-refresh' IPC; dashboard preload listens via onRefresh callback.
+- Build/run: in flute-timer folder use npm start; package with npm run dist (electron-builder --win).
+- Known build caveat: Windows dist may require Administrator terminal or Developer Mode for symlink extraction.
+- Spec gap: Learning Timer + Alarm in spec/02_features.md is not implemented in app code yet.
+- Phase 4.1 refinement now enforces widget-only controls and dashboard-only analytics/calendar rendering.
+- Calendar detail panel now includes overlap-aware time placement for day sessions (side-by-side only when real overlap exists).
+- Dashboard now includes a direct `open-floating` launcher and a Settings tab for floating-window opacity.
+- Floating opacity is persisted in `userData/flute-timer-settings.json` and applied by the main process at startup.
+- Sessions now expose active note duration = sum(NoteEvent.duration), plus gap duration for comparison views.
+- Dashboard sessions tab now supports collapsible detail cards with editable note labels, tags, and descriptions.
+- Calendar day panel now has zoom controls for timeline scaling and surfaces total/active/gap time per day.
+- Session loading now validates that persisted `sessions` is an array before rendering or saving.
+- Calendar refreshes preserve the current month, selected day, and zoom level instead of resetting view state.
+- Phase 5 pitch intelligence uses 2048-sample frames, 0.35 pitch-confidence threshold, and 27.5 Hz to 4186.01 Hz note mapping range.
+- Breath-dominant frames are excluded from `dominantNote` and note distribution metrics.
+- `NoteEvent` now carries `avgFrequency`, `detectedNotes`, and `dominantNote` as derived pitch-intelligence fields.
+- Phase 5 skills are now split across skills/08_pitch_detection.md through skills/11_breath_analysis.md, with avgFrequency finalized from valid pitch samples at note close.
+- Phase 5 task plan added at tasks/10_audio_intelligence.md with 11 ordered tasks and per-task validation checkpoints.
+- Phase 4.3 visualizer uses IPC-fed live FFT frames, a dashboard Visualizer tab, and clears only on session boundaries.
+- Phase 4.4 skills now add shared frame reuse, HPS-first pitch routing, and dedicated spectrogram/waveform/HPS/visualizer optimization docs.
+- Phase 4.4 tasks now add a dedicated execution plan at tasks/11_audio_visualization.md for shared FFT access, HPS routing, spectrogram, waveform, and visualizer guardrails.
