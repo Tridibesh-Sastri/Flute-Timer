@@ -25,11 +25,15 @@ This specification represents the universally exact boundaries of data schemas a
 - UI layers should derive fallback labels as `Session #<index>` without mutating historical records unless user edits the name.
 - Existing notes that do not contain `tags` must remain valid and should render as having no tags until the user edits them.
 - Existing notes that do not contain `endTime` must remain valid and should derive their closing timestamp from `startTime + duration` when needed.
+- Existing notes that do not contain pitch-intelligence fields must remain valid and should derive empty or zero-valued pitch metadata until pitch data is available.
 
 ### `NoteEvent` Type Structure
 - `startTime`: Valid initial timestamp format mapped within the parent session time range.
 - `endTime`: Valid concluding timestamp format mapped within the parent session time range.
 - `duration`: Calculated elapsed ms tracking the unbroken trigger duration.
+- `avgFrequency`: Derived mean frequency in Hz computed from valid pitch frames captured inside the note. Defaults to `0` when no valid pitch frames exist.
+- `detectedNotes`: Ordered array of unique mapped note labels observed inside the note. Defaults to `[]` when no valid pitch frames exist.
+- `dominantNote`: Dominant mapped note label string for the note. Defaults to `''` when no valid pitch frames exist.
 - `label`: Standard editable system string mapping context definitions.
 - `description`: Standard editable system string mapping expanded user inputs.
 - `tags`: Editable array of short label strings, typically normalized from a comma-separated user input.

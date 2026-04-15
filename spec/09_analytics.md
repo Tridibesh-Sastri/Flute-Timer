@@ -14,6 +14,11 @@ This file defines the strict mathematical metrics computed by the system.
 8. **Session gap duration**: `Session.duration - active note duration`, clamped to zero for display.
 9. **Total active note duration**: Sum of all active note durations across all sessions.
 10. **Session efficiency ratio**: `total active note duration / total session duration`.
+11. **Pitch stability score**: Mean of per-note stability scores inside the requested scope.
+12. **Pitch stability variance**: Variance of per-note stability scores inside the requested scope.
+13. **Note distribution**: Count of `dominantNote` values inside the requested scope.
+14. **Most played note**: `dominantNote` value with the highest distribution count.
+15. **Frequency variance**: Variance of `avgFrequency` values inside the requested scope.
 
 ## Calendar Abstract Structure
 - Valid `Session` object definitions explicitly map into a valid calendar entity unit.
@@ -26,3 +31,19 @@ This file defines the strict mathematical metrics computed by the system.
 ## Summary Comparison Requirements
 - The summary surface must compare total session duration against total active note duration so the user can distinguish real practice time from overhead time.
 - The summary surface must expose the absolute gap between those two values, as well as the aggregate totals used to derive them.
+
+## Pitch Analytics Rules
+- Scope means the session set being rendered or summarized.
+- For each `NoteEvent`, let `F = [f1 ... fn]` be the valid pitch samples captured for the note after excluding breath-dominant frames and out-of-range frequencies.
+- If `F` is empty, the note contributes `0` to pitch stability, `''` to `dominantNote`, `[]` to `detectedNotes`, and `0` to `avgFrequency`.
+- `avgFrequency = sum(F) / n`.
+- `varianceHz = sum((fi - avgFrequency)^2) / n`.
+- `stdDevHz = sqrt(varianceHz)`.
+- `notePitchStability = max(0, 1 - (stdDevHz / max(avgFrequency, 1)))`.
+- Session pitch stability score is the arithmetic mean of `notePitchStability` values across the scope.
+- Pitch stability variance is the variance of `notePitchStability` values across the scope.
+- Note distribution counts each `NoteEvent` once by its `dominantNote`.
+- Notes with empty `dominantNote` are excluded from note distribution and most-played-note counts.
+- Most played note ties are broken by higher cumulative note duration, then alphabetically ascending label.
+- Frequency variance is computed from `avgFrequency` values only; notes with `avgFrequency = 0` are excluded unless all notes are zero, in which case the result is `0`.
+- Breath-dominant notes are included in pitch stability as zero-valued notes if no valid pitch samples exist, but they are excluded from note distribution unless a dominant note is present.

@@ -56,3 +56,99 @@ Provide month navigation and day-level session inspection with time-aware visual
 
 ### 6. Constraints
 - Keep interaction lightweight and local to dashboard rendering only.
+
+---
+
+## Sub-Skill: Pitch Stability Calculation
+
+### 1. Purpose
+Converts note-level pitch samples into a deterministic stability score.
+
+### 2. APIs / Concepts Used
+- arithmetic mean
+- population variance
+- square root
+
+### 3. Step-by-Step Implementation
+1. Collect the valid pitch frequencies for one note only.
+2. If the note has no valid pitch samples, assign stability score 0.
+3. Calculate `avgFrequency = sum(frequencies) / count`.
+4. Calculate `varianceHz = sum((frequency - avgFrequency)^2) / count`.
+5. Calculate `stdDevHz = sqrt(varianceHz)`.
+6. Calculate `notePitchStability = max(0, 1 - (stdDevHz / max(avgFrequency, 1)))`.
+7. For a session or summary scope, average all notePitchStability values.
+
+### 4. Inputs / Outputs
+- **Inputs**: valid pitch samples per note.
+- **Outputs**: notePitchStability and aggregate pitch stability score.
+
+### 5. Edge Cases
+- Single-sample note: stability score is 1 when the sample is valid.
+- All samples zero or missing: stability score is 0.
+
+### 6. Constraints
+- Use population variance only.
+- Do not include breath-dominant frames in pitch samples.
+
+---
+
+## Sub-Skill: Note Distribution Aggregation
+
+### 1. Purpose
+Counts the dominant note labels across a scope.
+
+### 2. APIs / Concepts Used
+- frequency map
+- ordered note labels
+
+### 3. Step-by-Step Implementation
+1. Read `dominantNote` from each note in scope.
+2. Ignore notes whose dominantNote is empty.
+3. Increment the count for each dominantNote.
+4. Keep total note duration per label for tie breaking.
+5. Select the label with the highest count as most played note.
+6. If counts tie, choose the label with the higher cumulative duration.
+7. If duration also ties, choose the alphabetically earliest label.
+
+### 4. Inputs / Outputs
+- **Inputs**: note list with dominantNote and duration values.
+- **Outputs**: note distribution map and most played note label.
+
+### 5. Edge Cases
+- Empty scope: return an empty map and blank most played note.
+- Notes with empty dominantNote: exclude from counts.
+
+### 6. Constraints
+- Read-only aggregation only.
+
+---
+
+## Sub-Skill: Variance Calculation
+
+### 1. Purpose
+Computes deterministic spread metrics for pitch stability and average frequency.
+
+### 2. APIs / Concepts Used
+- population variance formula
+- arithmetic mean
+
+### 3. Step-by-Step Implementation
+1. Build the numeric input set for the requested metric.
+2. If the set is empty, return 0.
+3. If the set contains only zeros, return 0.
+4. Calculate the arithmetic mean.
+5. Calculate the sum of squared deviations from the mean.
+6. Divide by the number of values to get population variance.
+7. Use the same rule set for both stability variance and frequency variance.
+
+### 4. Inputs / Outputs
+- **Inputs**: notePitchStability values or avgFrequency values.
+- **Outputs**: variance value.
+
+### 5. Edge Cases
+- Single value: variance is 0.
+- Mixed zero and non-zero values: zeros participate unless the rule for the requested metric excludes them.
+
+### 6. Constraints
+- No sample weighting.
+- No rounding until presentation time.

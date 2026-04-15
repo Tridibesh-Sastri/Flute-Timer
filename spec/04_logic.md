@@ -23,6 +23,31 @@
 - The volume threshold logic must be fully exposed as adjustable values.
 - Implements user-controlled sensitivity interfaces.
 
+## Pitch Tracking During NoteEvent
+- While a NoteEvent is active, each valid pitch frame must be captured into a rolling analysis buffer.
+- Only frames that satisfy the pitch confidence and frequency band rules from [spec/10_audio_intelligence.md](spec/10_audio_intelligence.md) may contribute to pitch aggregates.
+- Breath-dominant frames must not alter pitch aggregates, detected notes, or dominant note selection.
+- On note closure, the system must finalize `avgFrequency`, `detectedNotes`, and `dominantNote` from the captured pitch samples.
+- If a note contains no valid pitch frames, the finalized values must be `avgFrequency = 0`, `detectedNotes = []`, and `dominantNote = ''`.
+
+## Note Detection Pipeline
+- While the Session is active, audio processing must evaluate frames in this order:
+	- RMS gate for note start and note end.
+	- Pitch classification for valid note frames.
+	- Breath classification for non-pitch frames.
+	- Note finalization on silence closure or session end.
+- A note starts only when RMS exceeds the start threshold and the current Session is active.
+- A note remains active until RMS stays below the stop threshold for the configured silence delay.
+- Pitch metadata must be accumulated only during the active note window.
+- Session end must force-close any active note and finalize its pitch aggregates using the same rules as a normal silence closure.
+
+## Dominant Note Calculation
+- Each valid pitch frame must be mapped to a note label using the formula in [spec/10_audio_intelligence.md](spec/10_audio_intelligence.md).
+- `dominantNote` is the mapped note label with the highest frame count within the note.
+- If two labels have the same frame count, the one with the higher cumulative frame confidence wins.
+- If a tie still remains, the label that appeared first in the note wins.
+- `detectedNotes` is the ordered unique list of mapped note labels encountered in the note, preserving first-seen order.
+
 ## Detail View Interaction
 - Session note edits performed in the Dashboard must persist through localStorage updates without changing the computed timing fields.
 - Calendar zoom controls must only change the rendered scale of the day timeline and must never change the underlying start or end timestamps of any Session.

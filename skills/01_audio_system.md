@@ -128,3 +128,130 @@ Audio module logic MUST NOT select, inject, or mutate DOM components (e.g., bypa
 ### 6. Constraints
 - Execution completely locked natively verifying internal bounds.
 - Tied specifically only into the internal system detection limits avoiding DOM manipulations entirely. Audio states update via defined system callbacks strictly separated from structural layers.
+
+---
+
+## Sub-Skill: Pitch Detection Pipeline
+
+### 1. Purpose
+Transforms each active audio frame into a deterministic pitch candidate for note intelligence.
+
+### 2. APIs / Concepts Used
+- `AnalyserNode`
+- `requestAnimationFrame`
+- time-domain and frequency-domain buffer reads
+
+### 3. Step-by-Step Implementation
+1. Execute only while the Session is active.
+2. Verify `AudioContext.sampleRate` is within 44100 Hz to 48000 Hz inclusive; if not, skip pitch classification for the frame.
+3. Capture one 2048-sample analyser frame using preallocated buffers only.
+4. Apply the RMS gate before any pitch classification.
+5. Analyze only the 80 Hz to 4000 Hz band.
+6. Emit one scalar frequency candidate and one confidence value per frame.
+7. Forward valid pitch results to note mapping and note tracking.
+
+### 4. Inputs / Outputs
+- **Inputs**: live analyser frame and session-active state.
+- **Outputs**: `frequencyHz`, `pitchConfidence`, and a validity decision for downstream note logic.
+
+### 5. Edge Cases
+- Sample rate out of range: keep session timing active, disable pitch intelligence for the frame.
+- Zero-energy frame: emit no pitch result.
+- Frame with no clear peak: preserve the last valid pitch result and do not emit a new note label.
+
+### 6. Constraints
+- One pitch analysis pass per animation frame.
+- No raw audio persistence.
+- No buffer allocation per frame.
+
+---
+
+## Sub-Skill: Frequency Extraction Method
+
+### 1. Purpose
+Converts the strongest valid spectral peak into a deterministic scalar frequency.
+
+### 2. APIs / Concepts Used
+- spectral magnitude bins from the current analyser frame
+- logarithmic frequency-to-bin mapping
+
+### 3. Step-by-Step Implementation
+1. Determine the lowest and highest usable bins from 80 Hz and 4000 Hz.
+2. Select the bin with the largest magnitude inside that band.
+3. If both neighboring bins exist, refine the peak using quadratic interpolation around the center bin.
+4. Convert the refined bin to Hertz using the analyser sample rate and FFT size.
+5. Clamp non-finite or unstable interpolation results back to the center bin frequency.
+6. Reject any candidate outside the valid pitch range.
+
+### 4. Inputs / Outputs
+- **Inputs**: spectral magnitudes, analyser sample rate, FFT size.
+- **Outputs**: one refined `frequencyHz` value or an empty classification.
+
+### 5. Edge Cases
+- Adjacent bins missing at band edges: use the center bin without interpolation.
+- Multiple bins with equal magnitude: choose the lowest-frequency bin first for determinism.
+- Non-finite arithmetic: discard the frame classification.
+
+### 6. Constraints
+- Frequency extraction must remain deterministic for the same frame sequence.
+
+---
+
+## Sub-Skill: Real-Time Sampling Loop
+
+### 1. Purpose
+Keeps the audio analysis loop aligned with session state and frame budget limits.
+
+### 2. APIs / Concepts Used
+- `requestAnimationFrame`
+- Session active boolean
+- reusable analyser buffers
+
+### 3. Step-by-Step Implementation
+1. Start the sampling loop only after a Session becomes active.
+2. On each frame, read audio once and perform the minimum required analysis.
+3. If the Session is inactive, exit immediately and do not schedule a new analysis pass.
+4. Process RMS gating before pitch work.
+5. Process pitch work before note finalization.
+6. Re-arm the loop only after the current frame finishes.
+
+### 4. Inputs / Outputs
+- **Inputs**: active session state and current analyser frame.
+- **Outputs**: per-frame RMS, pitch candidate, and note-state updates.
+
+### 5. Edge Cases
+- Session stops mid-frame: the current frame must not enqueue another frame after completion.
+- Audio context not ready: skip pitch work and preserve the last valid state.
+
+### 6. Constraints
+- The loop must remain lightweight enough for the floating widget to stay responsive.
+
+---
+
+## Sub-Skill: Frame Throttling Logic
+
+### 1. Purpose
+Prevents redundant pitch work and guarantees one classification pass per animation frame.
+
+### 2. APIs / Concepts Used
+- pending frame handle
+- last valid pitch result cache
+
+### 3. Step-by-Step Implementation
+1. Maintain exactly one pending frame request at a time.
+2. If a request is already pending, do not enqueue another one.
+3. If a frame cannot be classified within budget, skip label emission for that frame.
+4. Retain the last valid pitch classification until a new valid frame replaces it.
+5. Clear the pending request when the Session ends.
+
+### 4. Inputs / Outputs
+- **Inputs**: current frame budget and session state.
+- **Outputs**: throttled pitch analysis with stable downstream values.
+
+### 5. Edge Cases
+- Rapid start-stop: the pending frame handle must be cleared before a new Session begins.
+- Repeated invalid frames: the loop must keep running without growing the queue.
+
+### 6. Constraints
+- No background polling.
+- No multiple queued classification frames.
