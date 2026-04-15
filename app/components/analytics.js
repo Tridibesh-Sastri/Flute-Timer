@@ -25,6 +25,101 @@ function getSessionActiveDuration(session) {
   return session.notes.reduce((sum, note) => sum + Math.max(0, Number(note.duration) || 0), 0);
 }
 
+function getAllNotes(sessions) {
+  const notes = [];
+  sessions.forEach((session) => {
+    if (!Array.isArray(session.notes)) return;
+    session.notes.forEach((note) => notes.push(note));
+  });
+  return notes;
+}
+
+function mean(values) {
+  if (!Array.isArray(values) || values.length === 0) return 0;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function populationVariance(values) {
+  if (!Array.isArray(values) || values.length === 0) return 0;
+  const average = mean(values);
+  return values.reduce((sum, value) => sum + Math.pow(value - average, 2), 0) / values.length;
+}
+
+function formatDecimal(value, digits = 2) {
+  if (!Number.isFinite(value)) return '0';
+  return value.toFixed(digits);
+}
+
+function getNotePitchStability(note) {
+  if (!note) return 0;
+
+  const avgFrequency = Number(note.avgFrequency) || 0;
+  if (avgFrequency <= 0) return 0;
+
+  const pitchStdDevHz = Number.isFinite(note.pitchStdDevHz)
+    ? note.pitchStdDevHz
+    : Math.sqrt(Math.max(0, Number(note.pitchVarianceHz) || 0));
+
+  if (!Number.isFinite(pitchStdDevHz)) return 0;
+  return Math.max(0, 1 - (pitchStdDevHz / Math.max(avgFrequency, 1)));
+}
+
+function getPitchStabilityScore(notes) {
+  const values = notes.map(getNotePitchStability);
+  return mean(values);
+}
+
+function getPitchStabilityVariance(notes) {
+  const values = notes.map(getNotePitchStability);
+  return populationVariance(values);
+}
+
+function getFrequencyVariance(notes) {
+  const frequencies = notes
+    .map(note => Number(note.avgFrequency) || 0)
+    .filter(value => value > 0);
+
+  if (!frequencies.length) return 0;
+  return populationVariance(frequencies);
+}
+
+function buildNoteDistribution(notes) {
+  const distribution = new Map();
+
+  notes.forEach((note) => {
+    const label = String(note && note.dominantNote ? note.dominantNote : '').trim();
+    if (!label) return;
+
+    const duration = Math.max(0, Number(note.duration) || 0);
+    const entry = distribution.get(label) || { count: 0, duration: 0 };
+    entry.count += 1;
+    entry.duration += duration;
+    distribution.set(label, entry);
+  });
+
+  return distribution;
+}
+
+function getMostPlayedNote(distribution) {
+  const entries = [...distribution.entries()].map(([label, value]) => ({
+    label,
+    count: value.count,
+    duration: value.duration
+  }));
+
+  if (!entries.length) {
+    return { label: '', count: 0, duration: 0 };
+  }
+
+  entries.sort((a, b) => {
+    if (b.count !== a.count) return b.count - a.count;
+    if (b.duration !== a.duration) return b.duration - a.duration;
+    return a.label.localeCompare(b.label);
+  });
+
+  return entries[0];
+}
+
 function calculateStreak(sessions) {
   const dayKeys = sessions
     .filter(s => s.startTime)
@@ -73,6 +168,29 @@ function buildBarRows(rows, maxValue, labelFmt, valueFmt) {
         <span class="bar-count">${valueFmt(row)}</span>
       </div>`;
   }).join('');
+}
+
+function buildNoteDistributionBars(notes) {
+  const distribution = buildNoteDistribution(notes);
+  const rows = [...distribution.entries()].map(([label, value]) => ({
+    label,
+    value: value.count,
+    duration: value.duration
+  }));
+
+  rows.sort((a, b) => {
+    if (b.value !== a.value) return b.value - a.value;
+    if (b.duration !== a.duration) return b.duration - a.duration;
+    return a.label.localeCompare(b.label);
+  });
+
+  const maxValue = Math.max(...rows.map(row => row.value), 1);
+  return buildBarRows(
+    rows,
+    maxValue,
+    row => row.label,
+    row => String(row.value)
+  );
 }
 
 function buildComparisonRows(rows, maxDuration) {
@@ -126,6 +244,13 @@ window.renderAnalytics = function(containerId, sessions) {
     };
   });
 
+  const allNotes = getAllNotes(sessions);
+  const pitchStabilityScore = getPitchStabilityScore(allNotes);
+  const pitchStabilityVariance = getPitchStabilityVariance(allNotes);
+  const frequencyVariance = getFrequencyVariance(allNotes);
+  const noteDistribution = buildNoteDistribution(allNotes);
+  const mostPlayedNote = getMostPlayedNote(noteDistribution);
+
   let totalDuration = 0;
   let totalActiveDuration = 0;
   let totalGapDuration = 0;
@@ -167,6 +292,7 @@ window.renderAnalytics = function(containerId, sessions) {
   const efficiency = totalDuration > 0 ? Math.round((totalActiveDuration / totalDuration) * 100) : 0;
   const streak = calculateStreak(sessions);
   const shortestNoteDisplay = Number.isFinite(shortestNote) ? shortestNote : 0;
+  const noteDistributionBars = buildNoteDistributionBars(allNotes);
 
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const weekdayRows = dayNames.map((name, idx) => ({ label: name, value: dayMap[idx] || 0 }));
@@ -274,6 +400,25 @@ window.renderAnalytics = function(containerId, sessions) {
       </div>
     </div>
 
+    <div class="cards-row">
+      <div class="stat-card ${pitchStabilityScore >= 0.75 ? 'card-highlight' : ''}">
+        <div class="stat-value">${Math.round(pitchStabilityScore * 100)}%</div>
+        <div class="stat-label">Pitch Stability</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">${formatDecimal(pitchStabilityVariance, 3)}</div>
+        <div class="stat-label">Pitch Stability Variance</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">${escapeHtml(mostPlayedNote.label || '—')}</div>
+        <div class="stat-label">Most Played Note</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">${formatDecimal(frequencyVariance, 2)}</div>
+        <div class="stat-label">Frequency Variance</div>
+      </div>
+    </div>
+
     <div class="comparison-section">
       <div class="chart-title">Session Duration vs Active Note Time (Recent)</div>
       <div class="comparison-list">
@@ -294,6 +439,11 @@ window.renderAnalytics = function(containerId, sessions) {
     <div class="chart-section">
       <div class="chart-title">Note Count per Session (Recent)</div>
       <div class="bar-chart">${noteBars}</div>
+    </div>
+
+    <div class="chart-section">
+      <div class="chart-title">Note Distribution</div>
+      <div class="bar-chart">${noteDistributionBars || '<div class="cal-timeline-empty">No pitch distribution available yet.</div>'}</div>
     </div>
 
     <div class="chart-section">

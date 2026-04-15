@@ -44,6 +44,11 @@ function getSessionActiveDuration(session) {
     return session.notes.reduce((sum, note) => sum + Math.max(0, Number(note.duration) || 0), 0);
 }
 
+function getSessionGapDuration(session) {
+    if (!session) return 0;
+    return Math.max((session.duration || 0) - getSessionActiveDuration(session), 0);
+}
+
 function updateSessionDisplay() {
   const elapsed = Date.now() - sessionStartTime;
   document.getElementById('session-timer-display').textContent = formatElapsed(elapsed);
@@ -55,6 +60,9 @@ function toggleSession() {
   if (!window.isSessionActive) {
     // Start
     window.isSessionActive = true;
+    if (typeof window.clearVisualizerFrame === 'function') {
+        window.clearVisualizerFrame();
+    }
         if (typeof window.startAudioMonitoring === 'function') {
                 window.startAudioMonitoring();
         }
@@ -84,6 +92,9 @@ function toggleSession() {
     window.isSessionActive = false;
     if (typeof window.stopAudioMonitoring === 'function') {
         window.stopAudioMonitoring();
+    }
+    if (typeof window.clearVisualizerFrame === 'function') {
+        window.clearVisualizerFrame();
     }
     cancelAnimationFrame(sessionAnimationFrame);
     const elapsed = Date.now() - sessionStartTime;
@@ -177,8 +188,9 @@ function createSessionDOM(session, sIndex, isLive) {
     const idStr = isLive ? 'Live Session' : (session.name || (`Session #${sIndex + 1}`));
     const durStr = session.endTime ? session.duration + 'ms' : 'Tracking...';
     const activeStr = msToStr(getSessionActiveDuration(session));
+    const gapStr = msToStr(getSessionGapDuration(session));
     const noteCount = Array.isArray(session.notes) ? session.notes.length : 0;
-    header.innerText = `${idStr} | Notes: ${noteCount} | Dur: ${durStr} | Active: ${activeStr}`;
+    header.innerText = `${idStr} | Notes: ${noteCount} | Dur: ${durStr} | Active: ${activeStr} | Gap: ${gapStr}`;
     if (isLive) header.id = 'live-session-header';
     
     const notesContainer = document.createElement('div');

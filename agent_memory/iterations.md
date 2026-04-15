@@ -170,3 +170,94 @@ Changes Made: Synced spec, skills, and task docs to approved dual-window Phase 4
 Errors: None
 Fix Applied: N/A
 Result: Success
+
+
+[Iteration 14]
+Command: Phase 5 Task 1 - Audio Frame Extraction
+Files Modified:
+- app/renderer/audio.js
+Changes Made: Added a reusable 2048-sample analyser frame buffer and a capture helper that reads the current float time-domain frame from the existing live audio stream without altering RMS gating or session timing behavior. Kept the existing byte-domain RMS path intact and left raw audio ephemeral in memory only.
+Errors: Initial smoke test was launched from the parent folder and could not find package.json.
+Fix Applied: Reran `npm start` from the correct `flute-timer` project directory and confirmed Electron startup reached without runtime errors.
+Result: Success
+
+
+[Iteration 15]
+Command: Phase 5 Task 2 - Pitch Detection Engine
+Files Modified:
+- app/renderer/audio.js
+Changes Made: Added raw FFT pitch analysis with a reusable spectrum buffer, peak-bin search, quadratic interpolation, and confidence calculation. Exposed the latest valid pitch analysis in renderer state while keeping invalid or silent frames from overwriting the current result.
+Errors: None
+Fix Applied: N/A
+Result: Success
+
+
+[Iteration 16]
+Command: Phase 5 Task 3 - Frequency Filtering
+Files Modified:
+- app/renderer/audio.js
+Changes Made: Added a filtered pitch analysis layer that rejects frames below the 0.35 confidence threshold or outside the valid note range while preserving the last valid filtered result. Separated raw pitch output from the filtered renderer state so silence and noise do not overwrite the accepted pitch signal.
+Errors: None
+Fix Applied: N/A
+Result: Success
+
+
+[Iteration 17]
+Command: Phase 5 Task 4 - Note Mapping
+Files Modified:
+- app/renderer/audio.js
+Changes Made: Added equal-temperament frequency-to-note mapping with sharps-only note names, MIDI rounding, octave derivation, and note-label output. Enriched the filtered pitch result with `noteName`, `octave`, `noteLabel`, and `midiNumber` for downstream note tracking.
+Errors: None
+Fix Applied: N/A
+Result: Success
+
+
+[Iteration 18]
+Command: Phase 5 Task 5 - Real-Time Pitch Loop
+Files Modified:
+- app/renderer/audio.js
+- app/renderer/app.js
+Changes Made: Added a throttled pitch-readout publish path that runs from the existing requestAnimationFrame audio loop only during an active session. The loop now publishes the latest mapped pitch result at a 75 ms cadence and exposes a renderer callback sink for future UI rendering without adding per-frame DOM work.
+Errors: None
+Fix Applied: N/A
+Result: Success
+
+
+[Iteration 19]
+Command: Phase 5 Task 6 - NoteEvent Integration
+Files Modified:
+- app/renderer/audio.js
+Changes Made: Added per-note pitch aggregation during recording with rolling frequency sums, ordered unique detected note labels, and dominant-note selection using count, confidence, and first-seen tie-breaks. Finalized `avgFrequency`, `detectedNotes`, and `dominantNote` when the note closes and persisted them on the completed NoteEvent without altering note timing.
+Errors: None
+Fix Applied: N/A
+Result: Success
+
+
+[Iteration 20]
+Command: Phase 5 Task 7 - Breath Analysis
+Files Modified:
+- app/renderer/audio.js
+- app/components/sessionTimer.js
+Changes Made: Added breath-dominance detection from the same FFT frame, including breath-score calculation, breath-frame rejection from pitch aggregates, and active-note pitch gating down to the recording stop threshold so continuous airflow does not split the note. Exposed the session gap duration alongside active duration in the floating widget header to keep the note lifecycle visible.
+Errors: None
+Fix Applied: N/A
+Result: Success
+
+
+[Iteration 21]
+Command: Phase 4.3 Audio Visualizer & Debug Mode
+Files Modified:
+- app/main.js
+- app/preload.js
+- app/dashboard/dashboard_preload.js
+- app/dashboard/dashboard.html
+- app/dashboard/dashboard.js
+- app/dashboard/dashboard.css
+- app/components/visualizer.js
+- app/components/sessionTimer.js
+- app/renderer/audio.js
+- v002roadmap.txt
+Changes Made: Added a live IPC-fed FFT visualizer in the dashboard with a dedicated Visualizer tab, canvas spectrum rendering, peak note marker, harmonic guide lines, and live debug metrics for raw frequency, filtered frequency, confidence, note label, and rejected frames. The audio loop now publishes throttled spectrum frames without storing history, and the visualizer clears only on session boundaries.
+Errors: None
+Fix Applied: N/A
+Result: Success

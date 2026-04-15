@@ -68,6 +68,10 @@ function initTabs() {
       tab.classList.add('active');
       const targetPanel = document.getElementById(tab.dataset.tab);
       if (targetPanel) targetPanel.classList.add('active');
+
+      if (targetPanel && targetPanel.id === 'panel-visualizer' && typeof window.refreshVisualizerLayout === 'function') {
+        window.refreshVisualizerLayout();
+      }
     });
   });
 }
@@ -319,6 +323,7 @@ function renderDashboard() {
   if (window.renderAnalytics) window.renderAnalytics('panel-summary', sessions);
   if (window.renderCalendar) window.renderCalendar('panel-calendar', sessions);
   renderSessionsTab(sessions);
+  if (window.renderVisualizer) window.renderVisualizer('panel-visualizer');
   renderSettingsTab();
 }
 
@@ -346,5 +351,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (api && api.onRefresh) {
     api.onRefresh(() => renderDashboard());
+  }
+
+  if (api && api.onVisualizerFrame) {
+    api.onVisualizerFrame((frame) => {
+      if (typeof window.updateVisualizerFrame === 'function') {
+        window.updateVisualizerFrame(frame);
+      }
+    });
   }
 });

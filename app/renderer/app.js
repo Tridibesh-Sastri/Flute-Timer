@@ -23,6 +23,22 @@ window.onAudioError = function(msg) {
     if (statusEl) statusEl.textContent = msg;
 };
 
+window.onPitchReadout = function(readout) {
+    window.latestPitchReadout = readout;
+
+    const noteEl = document.getElementById('pitch-note-display');
+    if (noteEl) {
+        noteEl.textContent = readout && readout.noteLabel ? readout.noteLabel : '—';
+    }
+
+    const frequencyEl = document.getElementById('pitch-frequency-display');
+    if (frequencyEl) {
+        frequencyEl.textContent = readout && Number.isFinite(readout.frequencyHz)
+            ? `${readout.frequencyHz.toFixed(1)} Hz`
+            : '—';
+    }
+};
+
 document.addEventListener('DOMContentLoaded', async () => {
   setupWindowControls();
   setupSessionFeature();

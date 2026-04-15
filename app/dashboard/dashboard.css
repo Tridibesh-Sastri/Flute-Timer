@@ -942,3 +942,136 @@ body {
     grid-column: auto;
   }
 }
+
+/* ─────────────────────── Visualizer ─────────────────────── */
+.visualizer-shell {
+  display: grid;
+  gap: 14px;
+}
+
+.visualizer-stage {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid #1e1e1e;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+
+.visualizer-stage-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px 18px 10px;
+}
+
+.visualizer-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #f3f3f3;
+}
+
+.visualizer-subtitle {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #7d7d7d;
+  line-height: 1.5;
+}
+
+.visualizer-status {
+  align-self: flex-start;
+  background: rgba(0, 188, 212, 0.12);
+  border: 1px solid rgba(0, 188, 212, 0.22);
+  color: #89e7f3;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  font-variant-numeric: tabular-nums;
+}
+
+.visualizer-canvas {
+  width: 100%;
+  height: 320px;
+  display: block;
+}
+
+.visualizer-axis-caption {
+  padding: 0 18px 16px;
+  font-size: 11px;
+  color: #6e6e6e;
+}
+
+.visualizer-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.visualizer-metric,
+.visualizer-debug-panel {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid #1e1e1e;
+  border-radius: 10px;
+}
+
+.visualizer-metric {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 76px;
+}
+
+.visualizer-metric span,
+.visualizer-debug-row span {
+  font-size: 10px;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.visualizer-metric strong,
+.visualizer-debug-row strong {
+  font-size: 14px;
+  font-weight: 600;
+  color: #f0f0f0;
+  font-variant-numeric: tabular-nums;
+}
+
+.visualizer-debug-panel {
+  padding: 14px 16px;
+  display: grid;
+  gap: 10px;
+}
+
+.visualizer-debug-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.visualizer-debug-row strong {
+  text-align: right;
+}
+
+.tab-panel#panel-visualizer {
+  min-height: 0;
+}
+
+@media (max-width: 860px) {
+  .visualizer-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .visualizer-canvas {
+    height: 280px;
+  }
+
+  .visualizer-stage-header {
+    flex-direction: column;
+  }
+}

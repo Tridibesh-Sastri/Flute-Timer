@@ -5,5 +5,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   expand: () => ipcRenderer.send('window-expand'),
   close: () => ipcRenderer.send('window-close'),
   openDashboard: () => ipcRenderer.send('open-dashboard'),
-  notifyDashboard: () => ipcRenderer.send('dashboard-refresh')
+  notifyDashboard: () => ipcRenderer.send('dashboard-refresh'),
+  sendVisualizerFrame: (frame) => ipcRenderer.send('visualizer-frame', frame)
 });

@@ -134,6 +134,12 @@ app.whenReady().then(() => {
     }
   });
 
+  ipcMain.on('visualizer-frame', (_event, frame) => {
+    if (dashboardWindow && !dashboardWindow.isDestroyed()) {
+      dashboardWindow.webContents.send('visualizer-frame', frame);
+    }
+  });
+
   // Window controls (shared by both windows)
   ipcMain.on('window-minimize', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
