@@ -49,6 +49,15 @@
     renderGrid();
   }
 
+  function loadStoredSessions() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem('sessions'));
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (err) {
+      return [];
+    }
+  }
+
   function timeLabel(date) {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
@@ -367,10 +376,7 @@
 
   window.renderCalendar = function(containerId, sessions) {
     _containerId = containerId;
-    _sessions = sessions || JSON.parse(localStorage.getItem('sessions')) || [];
-    _year = new Date().getFullYear();
-    _month = new Date().getMonth();
-    _selectedDay = null;
+    _sessions = Array.isArray(sessions) ? sessions : loadStoredSessions();
     renderGrid();
   };
 })();

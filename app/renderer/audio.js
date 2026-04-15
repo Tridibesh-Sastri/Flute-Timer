@@ -11,6 +11,19 @@ let reqFrame = null;
 
 window.isRecording = false;
 
+function startAudioLoop() {
+  if (reqFrame === null) {
+    reqFrame = requestAnimationFrame(processAudio);
+  }
+}
+
+function stopAudioLoop() {
+  if (reqFrame !== null) {
+    cancelAnimationFrame(reqFrame);
+    reqFrame = null;
+  }
+}
+
 async function setupAudio() {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
@@ -24,7 +37,7 @@ async function setupAudio() {
     
     dataArray = new Uint8Array(analyser.fftSize);
     
-    processAudio();
+    startAudioLoop();
   } catch (err) {
     console.error("Mic access failed:", err);
     if (window.onAudioError) window.onAudioError("Mic Error: Check permissions");
@@ -61,8 +74,12 @@ function onStopRecording() {
   }
   
   if (window.currentSession) {
+    if (!Array.isArray(window.currentSession.notes)) {
+      window.currentSession.notes = [];
+    }
     window.currentSession.notes.push({
       startTime: new Date(Date.now() - elapsed).toISOString(),
+      endTime: new Date().toISOString(),
       duration: elapsed,
       label: '',
       description: '',
@@ -76,11 +93,16 @@ function onStopRecording() {
 window.onStopRecording = onStopRecording;
 
 function processAudio() {
-  reqFrame = requestAnimationFrame(processAudio);
+  reqFrame = null;
   if (!window.isSessionActive) {
-      return; 
+      return;
   }
   
+  if (!analyser || !dataArray) {
+    startAudioLoop();
+    return;
+  }
+
   analyser.getByteTimeDomainData(dataArray);
   const rms = calculateRMS(dataArray);
   
@@ -103,8 +125,14 @@ function processAudio() {
   if (isRecording && rms >= window.STOP_THRESHOLD) {
     silenceStartTime = 0;
   }
-  
-  
+
+  if (!window.isSessionActive) {
+    return;
+  }
+
+  startAudioLoop();
 }
 
 window.setupAudio = setupAudio;
+window.startAudioMonitoring = startAudioLoop;
+window.stopAudioMonitoring = stopAudioLoop;

@@ -100,7 +100,14 @@ function buildComparisonRows(rows, maxDuration) {
 window.renderAnalytics = function(containerId, sessions) {
   const container = document.getElementById(containerId);
   if (!container) return;
-  sessions = sessions || JSON.parse(localStorage.getItem('sessions')) || [];
+  if (!Array.isArray(sessions)) {
+    try {
+      const parsed = JSON.parse(localStorage.getItem('sessions'));
+      sessions = Array.isArray(parsed) ? parsed : [];
+    } catch (err) {
+      sessions = [];
+    }
+  }
 
   const sessionMetrics = sessions.map((session, index) => {
     const duration = session.duration || 0;

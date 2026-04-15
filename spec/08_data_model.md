@@ -24,9 +24,11 @@ This specification represents the universally exact boundaries of data schemas a
 - Existing persisted sessions that do not contain `name` must remain valid.
 - UI layers should derive fallback labels as `Session #<index>` without mutating historical records unless user edits the name.
 - Existing notes that do not contain `tags` must remain valid and should render as having no tags until the user edits them.
+- Existing notes that do not contain `endTime` must remain valid and should derive their closing timestamp from `startTime + duration` when needed.
 
 ### `NoteEvent` Type Structure
 - `startTime`: Valid initial timestamp format mapped within the parent session time range.
+- `endTime`: Valid concluding timestamp format mapped within the parent session time range.
 - `duration`: Calculated elapsed ms tracking the unbroken trigger duration.
 - `label`: Standard editable system string mapping context definitions.
 - `description`: Standard editable system string mapping expanded user inputs.

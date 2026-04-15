@@ -1,11 +1,19 @@
 window.isSessionActive = false;
 window.currentSession = null;
-window.sessions = JSON.parse(localStorage.getItem('sessions')) || [];
+function loadStoredSessions() {
+    try {
+        const parsed = JSON.parse(localStorage.getItem('sessions'));
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (err) {
+        return [];
+    }
+}
+
+window.sessions = loadStoredSessions();
 window.expandedSessionIds = new Set();
 window.currentSessionIndex = -1;
 
 let sessionStartTime = 0;
-let sessionDuration = 0;
 let sessionAnimationFrame = null;
 
 function msToStr(ms) {
@@ -47,6 +55,9 @@ function toggleSession() {
   if (!window.isSessionActive) {
     // Start
     window.isSessionActive = true;
+        if (typeof window.startAudioMonitoring === 'function') {
+                window.startAudioMonitoring();
+        }
     sessionStartTime = Date.now();
     const sessionNumber = window.sessions.length + 1;
     window.currentSession = {
@@ -71,6 +82,9 @@ function toggleSession() {
     }
     
     window.isSessionActive = false;
+    if (typeof window.stopAudioMonitoring === 'function') {
+        window.stopAudioMonitoring();
+    }
     cancelAnimationFrame(sessionAnimationFrame);
     const elapsed = Date.now() - sessionStartTime;
     
@@ -82,8 +96,6 @@ function toggleSession() {
     
     window.currentSession = null;
     window.currentSessionIndex = -1;
-    
-    sessionDuration += elapsed;
     
     document.getElementById('session-timer-display').textContent = '00:00:00';
     btn.textContent = 'Start Session (S)';

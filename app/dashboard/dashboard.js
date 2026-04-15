@@ -3,7 +3,12 @@
 const SESSION_EXPANDED_STATE = new Set();
 
 function loadSessions() {
-  return JSON.parse(localStorage.getItem('sessions')) || [];
+  try {
+    const parsed = JSON.parse(localStorage.getItem('sessions'));
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    return [];
+  }
 }
 
 function saveSessions(sessions) {
