@@ -10,7 +10,7 @@ body {
   height: 100vh;
   box-sizing: border-box;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  overflow: hidden;
+  overflow-y: auto;
   border: 1px solid #333;
   border-radius: 8px;
 }
@@ -68,7 +68,7 @@ body {
 
 #entry-logs {
   width: 100%;
-  flex-grow: 1;
+  flex: 1;
   overflow-y: auto;
   padding: 10px;
   box-sizing: border-box;
@@ -138,7 +138,129 @@ body {
   font-size: 11px;
   cursor: pointer;
   -webkit-app-region: no-drag;
+  transition: all 0.2s ease;
 }
 #session-toggle-btn:hover {
   background: rgba(255, 255, 255, 0.1);
+  border-color: #777;
+}
+
+#open-dashboard-btn {
+  background: rgba(0, 188, 212, 0.14);
+  color: #00d4ea;
+  border: 1px solid rgba(0, 188, 212, 0.4);
+  border-radius: 4px;
+  padding: 4px 10px;
+  margin-top: 8px;
+  font-size: 11px;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+#open-dashboard-btn:hover {
+  background: rgba(0, 188, 212, 0.22);
+  border-color: rgba(0, 212, 234, 0.6);
+}
+
+.threshold-control {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 10px;
+  font-size: 10px;
+  color: #888;
+  -webkit-app-region: no-drag;
+}
+.threshold-control input[type="range"] {
+  width: 120px;
+  margin-top: 2px;
+}
+
+.session-header {
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 10px 14px;
+  border-radius: 6px;
+  display: flex;
+  justify-content: space-between;
+  user-select: none;
+  font-weight: 500;
+  transition: background 0.2s ease;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+}
+.session-header:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.session-notes {
+  display: none;
+  flex-direction: column;
+  padding: 8px 10px;
+  gap: 5px;
+  border-left: 2px solid #555;
+  margin-left: 10px;
+}
+.session-notes.expanded {
+  display: flex;
+}
+
+.note-entry-box {
+  background: rgba(255, 255, 255, 0.05);
+  padding: 8px;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  transition: background 0.2s ease;
+}
+.note-entry-box:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+.note-info {
+  color: #ccc;
+  display: flex;
+  justify-content: space-between;
+  font-family: monospace;
+}
+.note-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.note-inputs input, .note-inputs textarea {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid #444;
+  color: #eee;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: inherit;
+  transition: border-color 0.2s, background 0.2s;
+  outline: none;
+}
+.note-inputs input:focus, .note-inputs textarea:focus {
+    border-color: #00bcd4;
+    background: rgba(0, 0, 0, 0.4);
+}
+.note-inputs textarea {
+  resize: vertical;
+  min-height: 40px;
+}
+
+.section-title {
+  width: 100%;
+  text-align: left;
+  border-bottom: 1px solid #444;
+  padding: 5px 15px;
+  margin-top: 15px;
+  margin-bottom: 5px;
+  font-size: 11px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #888;
+  box-sizing: border-box;
 }

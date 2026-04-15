@@ -1,5 +1,5 @@
-const START_THRESHOLD = 0.02;
-const STOP_THRESHOLD = 0.01;
+window.START_THRESHOLD = 0.02;
+window.STOP_THRESHOLD = 0.01;
 const SILENCE_DELAY_MS = 300;
 
 let isRecording = false;
@@ -27,7 +27,7 @@ async function setupAudio() {
     processAudio();
   } catch (err) {
     console.error("Mic access failed:", err);
-    document.getElementById('status-indicator').textContent = "Mic Error: Check permissions";
+    if (window.onAudioError) window.onAudioError("Mic Error: Check permissions");
   }
 }
 
@@ -44,25 +44,30 @@ function calculateRMS(data) {
 function onStartRecording() {
   window.isRecording = true;
   isRecording = true;
-  document.getElementById('status-indicator').textContent = 'Recording...';
-  document.getElementById('status-indicator').className = 'status-recording';
-  startTimerDisplay();
+  if(window.updateStatusUI) window.updateStatusUI(true);
+  if(window.startTimerDisplay) window.startTimerDisplay();
 }
 
 function onStopRecording() {
   window.isRecording = false;
   isRecording = false;
-  document.getElementById('status-indicator').textContent = 'Listening...';
-  document.getElementById('status-indicator').className = 'status-listening';
   
-  const { finalTimeStr, elapsed } = stopTimerDisplay();
+  if(window.updateStatusUI) window.updateStatusUI(false);
+  
+  let elapsed = 0;
+  if (window.stopTimerDisplay) {
+      const result = window.stopTimerDisplay();
+      elapsed = result.elapsed;
+  }
   
   if (window.currentSession) {
     window.currentSession.notes.push({
       startTime: new Date(Date.now() - elapsed).toISOString(),
       duration: elapsed
     });
-    window.renderSessionList();
+    if (window.onNoteComplete) {
+      window.onNoteComplete();
+    }
   }
 }
 window.onStopRecording = onStopRecording;
@@ -76,12 +81,12 @@ function processAudio() {
   analyser.getByteTimeDomainData(dataArray);
   const rms = calculateRMS(dataArray);
   
-  if (!isRecording && rms > START_THRESHOLD) {
+  if (!isRecording && rms > window.START_THRESHOLD) {
     onStartRecording();
     silenceStartTime = 0;
   }
   
-  if (isRecording && rms < STOP_THRESHOLD) {
+  if (isRecording && rms < window.STOP_THRESHOLD) {
     if (silenceStartTime === 0) {
       silenceStartTime = performance.now();
     } else {
@@ -92,7 +97,7 @@ function processAudio() {
     }
   }
   
-  if (isRecording && rms >= STOP_THRESHOLD) {
+  if (isRecording && rms >= window.STOP_THRESHOLD) {
     silenceStartTime = 0;
   }
   

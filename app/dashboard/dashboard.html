@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flute Timer — Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+
+  <!-- Custom title bar -->
+  <div class="dash-header">
+    <span class="drag-handle">🎵 Flute Timer — Dashboard</span>
+    <div class="dash-controls">
+      <button id="dash-min-btn" title="Minimize">─</button>
+      <button id="dash-max-btn" title="Maximize">□</button>
+      <button id="dash-close-btn" title="Close">✕</button>
+    </div>
+  </div>
+
+  <!-- Tab Navigation -->
+  <nav class="tab-nav">
+    <button class="tab-btn active" data-tab="panel-summary">📊 Summary</button>
+    <button class="tab-btn" data-tab="panel-calendar">📅 Calendar</button>
+    <button class="tab-btn" data-tab="panel-sessions">📋 Sessions</button>
+  </nav>
+
+  <!-- Tab Panels -->
+  <div id="panel-summary" class="tab-panel active"></div>
+  <div id="panel-calendar" class="tab-panel"></div>
+  <div id="panel-sessions" class="tab-panel"></div>
+
+  <script src="../components/analytics.js"></script>
+  <script src="../components/calendar.js"></script>
+  <script src="dashboard.js"></script>
+</body>
+</html>

@@ -24,7 +24,8 @@ Directly mutates the active Document Object Model using explicitly mapped target
 - **Missing DOM Nodes**: Initialize `if (!timerDisplay) return;` at the top of the function to block null reference crashes securely.
 
 ### 6. Constraints
-- Strict performance limits. Never invoke DOM layouts inside tightly bound high-frequency arrays like the raw RMS Web Audio buffers. Always debounce visual state modifications.
+- Strict Hybrid Rendering Model limits. The generic lightweight loop (`requestAnimationFrame` or `setInterval`) is exclusively allowed for Live text layer updates (e.g., `timerDisplay.innerText`). Never invoke structural DOM layouts (lists, sessions) inside this loop.
+
 
 ---
 
@@ -54,4 +55,64 @@ Iterates historically saved mappings outputting explicitly native child DOM elem
 - **Empty List**: Handle successfully generating blank or implicit "No sessions yet" states securely mapping boundaries directly.
 
 ### 6. Constraints
-- Render logic must be explicitly called exclusively on Session Load or Session Finalize events strictly.
+- Render logic (`renderSessionList`) must be strictly Event-Driven. It must only trigger on explicitly approved events: Session Start, Session End, Note End, and App Load.
+
+---
+
+## Sub-Skill: Dual-Window Electron Architecture
+
+### 1. Purpose
+Splits runtime responsibilities into a minimal floating widget and an intelligence-focused dashboard window.
+
+### 2. APIs / Concepts Used
+- `BrowserWindow`
+- `ipcMain` / `ipcRenderer`
+- `contextBridge`
+
+### 3. Step-by-Step Implementation
+1. Keep floating widget small, always-on-top, and focused on timer/session controls.
+2. Create dashboard window lazily (on user action), with standard resizable behavior.
+3. Route `open-dashboard` from widget to main process.
+4. If dashboard exists, focus it; otherwise create it.
+5. Keep data exchange simple: both windows read `localStorage` and refresh via explicit signal.
+
+### 4. Inputs / Outputs
+- **Inputs**: User interaction from floating widget.
+- **Outputs**: Dashboard open/focus behavior without impacting widget loop timing.
+
+### 5. Edge Cases
+- Dashboard closed while widget is active: widget continues unaffected.
+- Repeated open requests: focus existing dashboard, do not duplicate windows.
+
+### 6. Constraints
+- Do not move analytics/calendar rendering into floating widget.
+- Keep IPC minimal and purpose-specific.
+
+---
+
+## Sub-Skill: Dashboard Lifecycle via IPC
+
+### 1. Purpose
+Refreshes dashboard views only when meaningful events happen (for example session end), without polling.
+
+### 2. APIs / Concepts Used
+- `ipcRenderer.send('dashboard-refresh')`
+- `ipcMain.on('dashboard-refresh', ...)`
+- Dashboard preload callback registration
+
+### 3. Step-by-Step Implementation
+1. Expose `notifyDashboard()` in widget preload.
+2. On session end, widget sends `dashboard-refresh`.
+3. Main process forwards refresh event to dashboard webContents if open.
+4. Dashboard preload exposes `onRefresh(cb)`.
+5. Dashboard renderer re-runs its render pipeline in callback.
+
+### 4. Inputs / Outputs
+- **Inputs**: Session lifecycle completion events.
+- **Outputs**: Fresh dashboard cards/calendar/session list.
+
+### 5. Edge Cases
+- Dashboard not open: refresh signal should no-op safely.
+
+### 6. Constraints
+- Keep channel surface narrow (`open-dashboard`, `dashboard-refresh`) for feature communication.

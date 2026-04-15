@@ -116,7 +116,10 @@ Determines the strict boundaries mapping unbroken audio strings into NoteEvents 
 
 ### 4. Inputs / Outputs
 - **Inputs**: Calculated mathematical RMS integer boundaries.
-- **Outputs**: Logical explicitly executed trigger pathways mapping to `createNoteEvent()` and `finalizeNoteEvent()`.
+- **Outputs**: Logical explicitly executed DOM-agnostic triggers via generic callbacks like `window.onNoteComplete()`.
+
+### 4b. No DOM Interaction Rule
+Audio module logic MUST NOT select, inject, or mutate DOM components (e.g., bypassing `document.getElementById`). Instead, update global state flags natively and invoke explicitly defined `window.*` boundary hooks managed strictly by the generic app layer.
 
 ### 5. Edge Cases
 - **Rapid flickering spikes**: Mitigated naturally since hysteresis timers are securely restarted by spikes triggering `clearTimeout()`.
@@ -124,4 +127,4 @@ Determines the strict boundaries mapping unbroken audio strings into NoteEvents 
 
 ### 6. Constraints
 - Execution completely locked natively verifying internal bounds.
-- Tied specifically only into the internal system detection limits avoiding DOM manipulations entirely.
+- Tied specifically only into the internal system detection limits avoiding DOM manipulations entirely. Audio states update via defined system callbacks strictly separated from structural layers.

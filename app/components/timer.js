@@ -42,3 +42,6 @@ function stopTimerDisplay() {
   
   return { finalTimeStr, elapsed };
 }
+
+window.startTimerDisplay = startTimerDisplay;
+window.stopTimerDisplay = stopTimerDisplay;

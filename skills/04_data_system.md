@@ -55,3 +55,30 @@ Maps implicitly created audio limits cleanly linking dynamically mathematically 
 
 ### 6. Constraints
 - Modifies directly effectively capturing bounds properly dynamically intelligently securely correctly smoothly effectively seamlessly optimal successfully efficiently appropriately efficiently functionally efficiently efficiently cleanly effectively optimally smoothly effectively naturally exactly.
+
+---
+
+## Sub-Skill: Immediate Persistence & Safe Indexing
+
+### 1. Purpose
+Ensures that any user edit to a specific NoteEvent is immediately saved to localStorage without data displacement, using precise matrix indexing to isolate the exact target.
+
+### 2. APIs / Concepts Used
+- Direct array matrix indexing: `window.sessions[sIndex].notes[nIndex]`
+- `localStorage.setItem('sessions', JSON.stringify(window.sessions))`
+
+### 3. Step-by-Step Implementation
+1. Pass exactly `sIndex` (Session Index) and `nIndex` (Note Index) down to the edit function context.
+2. Intercept `change` or `keyup` events from input nodes representing the note fields.
+3. Update specific coordinates directly: `window.sessions[sIndex].notes[nIndex].label = newLabel`.
+4. Immediately post serialization to storage: `localStorage.setItem('sessions', JSON.stringify(window.sessions))`.
+
+### 4. Inputs / Outputs
+- **Inputs**: User keyboard input and explicitly tracked UI indices.
+- **Outputs**: Instantly refreshed single source of truth in `window.sessions` array and localStorage mirror.
+
+### 5. Edge Cases
+- **Out of bounds indexing**: Controlled by rigid index passing strictly during DOM generation.
+
+### 6. Constraints
+- ALL edits must bypass generic `find` or `filter` replacements and strictly use direct pointer indexing to execute the immediate persistence rule successfully.
