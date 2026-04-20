@@ -53,6 +53,26 @@
     }
   };
 
+  state.panelViews = state.panelViews || {};
+
+  const PANEL_VIEW_KEYS = ['spectrum', 'spectrogram', 'waveform', 'mfcc', 'timeline', 'summary'];
+  const PANEL_VIEW_TOOLTIPS = {
+    spectrum: 'Wheel or Ctrl+wheel to zoom. Drag to pan. Double-click to reset.',
+    spectrogram: 'Wheel or Ctrl+wheel to zoom. Drag to pan. Double-click to reset.',
+    waveform: 'Wheel or Ctrl+wheel to zoom. Drag to pan. Double-click to reset.',
+    mfcc: 'Wheel or Ctrl+wheel to zoom. Drag to pan. Double-click to reset.',
+    timeline: 'Wheel or Ctrl+wheel to zoom. Drag to pan. Double-click to reset.',
+    summary: 'Wheel or Ctrl+wheel to zoom. Drag to pan. Double-click to reset.'
+  };
+  const PANEL_VIEW_LIMITS = {
+    spectrum: { minZoom: 0.75, maxZoom: 8 },
+    spectrogram: { minZoom: 0.75, maxZoom: 8 },
+    waveform: { minZoom: 0.75, maxZoom: 8 },
+    mfcc: { minZoom: 0.75, maxZoom: 8 },
+    timeline: { minZoom: 0.75, maxZoom: 10 },
+    summary: { minZoom: 0.85, maxZoom: 4 }
+  };
+
   function clamp01(value) {
     if (!Number.isFinite(value) || value <= 0) return 0;
     if (value >= 1) return 1;
@@ -138,6 +158,305 @@
     if (Number.isFinite(frame.filteredConfidence)) return frame.filteredConfidence;
     if (Number.isFinite(frame.rawConfidence)) return frame.rawConfidence;
     return 0;
+  }
+
+  function clampNumber(value, minimum, maximum) {
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) return minimum;
+    return Math.min(maximum, Math.max(minimum, numericValue));
+  }
+
+  function createPanelViewState(panelKey) {
+    const limits = PANEL_VIEW_LIMITS[panelKey] || { minZoom: 0.75, maxZoom: 8 };
+
+    return {
+      key: panelKey,
+      canvas: null,
+      stage: null,
+      header: null,
+      resetButton: null,
+      zoomLabel: null,
+      zoom: 1,
+      panX: 0,
+      panY: 0,
+      minZoom: limits.minZoom,
+      maxZoom: limits.maxZoom,
+      isDragging: false,
+      pointerId: null,
+      dragStartX: 0,
+      dragStartY: 0,
+      dragStartPanX: 0,
+      dragStartPanY: 0
+    };
+  }
+
+  function getPanelView(panelKey) {
+    if (!state.panelViews[panelKey]) {
+      state.panelViews[panelKey] = createPanelViewState(panelKey);
+    }
+
+    return state.panelViews[panelKey];
+  }
+
+  function getPanelViewportSize(canvas) {
+    if (!canvas) return { width: 0, height: 0 };
+
+    return {
+      width: Math.max(0, Math.floor(canvas.offsetWidth || canvas.clientWidth || 0)),
+      height: Math.max(0, Math.floor(canvas.offsetHeight || canvas.clientHeight || 0))
+    };
+  }
+
+  function getPanelPanBounds(panelView) {
+    const { width, height } = getPanelViewportSize(panelView && panelView.canvas);
+    const zoom = Number.isFinite(panelView && panelView.zoom) ? panelView.zoom : 1;
+
+    if (width <= 0 || height <= 0) {
+      return null;
+    }
+
+    if (zoom >= 1) {
+      return {
+        minX: width - (width * zoom),
+        maxX: 0,
+        minY: height - (height * zoom),
+        maxY: 0
+      };
+    }
+
+    const centeredX = (width - (width * zoom)) / 2;
+    const centeredY = (height - (height * zoom)) / 2;
+    return {
+      minX: centeredX,
+      maxX: centeredX,
+      minY: centeredY,
+      maxY: centeredY
+    };
+  }
+
+  function syncPanelZoomLabel(panelView) {
+    if (panelView && panelView.zoomLabel) {
+      panelView.zoomLabel.textContent = `${Math.round(panelView.zoom * 100)}%`;
+    }
+  }
+
+  function applyPanelViewTransform(panelView) {
+    if (!panelView || !panelView.canvas) return;
+
+    const bounds = getPanelPanBounds(panelView);
+    if (bounds) {
+      panelView.panX = clampNumber(panelView.panX, bounds.minX, bounds.maxX);
+      panelView.panY = clampNumber(panelView.panY, bounds.minY, bounds.maxY);
+    }
+
+    panelView.canvas.style.transformOrigin = '0 0';
+    panelView.canvas.style.transform = `translate(${panelView.panX}px, ${panelView.panY}px) scale(${panelView.zoom})`;
+    panelView.canvas.style.willChange = 'transform';
+    panelView.canvas.style.cursor = panelView.isDragging ? 'grabbing' : 'grab';
+    panelView.canvas.classList.toggle('is-panning', panelView.isDragging);
+    syncPanelZoomLabel(panelView);
+  }
+
+  function resetPanelView(panelKey) {
+    const panelView = getPanelView(panelKey);
+    panelView.zoom = 1;
+    panelView.panX = 0;
+    panelView.panY = 0;
+    panelView.isDragging = false;
+    panelView.pointerId = null;
+    applyPanelViewTransform(panelView);
+  }
+
+  function zoomPanelView(panelView, nextZoom, anchorX, anchorY) {
+    if (!panelView || !panelView.canvas) return;
+
+    const canvasRect = panelView.canvas.getBoundingClientRect();
+    const previousZoom = Math.max(0.0001, panelView.zoom);
+    const clampedZoom = clampNumber(nextZoom, panelView.minZoom, panelView.maxZoom);
+
+    if (Number.isFinite(anchorX) && Number.isFinite(anchorY)) {
+      const offsetX = anchorX - canvasRect.left;
+      const offsetY = anchorY - canvasRect.top;
+      const scaleRatio = clampedZoom / previousZoom;
+      panelView.panX += offsetX * (1 - scaleRatio);
+      panelView.panY += offsetY * (1 - scaleRatio);
+    }
+
+    panelView.zoom = clampedZoom;
+    applyPanelViewTransform(panelView);
+  }
+
+  function panPanelView(panelView, deltaX, deltaY) {
+    if (!panelView) return;
+
+    const zoomScale = Math.max(1, panelView.zoom);
+    panelView.panX += deltaX / zoomScale;
+    panelView.panY += deltaY / zoomScale;
+    applyPanelViewTransform(panelView);
+  }
+
+  function onPanelPointerDown(event) {
+    if (event.button !== 0 && event.pointerType !== 'touch') return;
+
+    const canvas = event.currentTarget;
+    const panelKey = canvas && canvas.dataset ? canvas.dataset.panelViewKey : null;
+    const panelView = panelKey ? getPanelView(panelKey) : null;
+    if (!panelView) return;
+
+    panelView.isDragging = true;
+    panelView.pointerId = event.pointerId;
+    panelView.dragStartX = event.clientX;
+    panelView.dragStartY = event.clientY;
+    panelView.dragStartPanX = panelView.panX;
+    panelView.dragStartPanY = panelView.panY;
+
+    if (canvas && typeof canvas.setPointerCapture === 'function') {
+      try {
+        canvas.setPointerCapture(event.pointerId);
+      } catch (err) {
+        // Ignore capture errors from non-primary pointers or detached canvases.
+      }
+    }
+
+    applyPanelViewTransform(panelView);
+    event.preventDefault();
+  }
+
+  function onPanelPointerMove(event) {
+    const canvas = event.currentTarget;
+    const panelKey = canvas && canvas.dataset ? canvas.dataset.panelViewKey : null;
+    const panelView = panelKey ? getPanelView(panelKey) : null;
+    if (!panelView || !panelView.isDragging || panelView.pointerId !== event.pointerId) return;
+
+    panelView.panX = panelView.dragStartPanX + (event.clientX - panelView.dragStartX);
+    panelView.panY = panelView.dragStartPanY + (event.clientY - panelView.dragStartY);
+    applyPanelViewTransform(panelView);
+    event.preventDefault();
+  }
+
+  function endPanelPointerDrag(event) {
+    const canvas = event.currentTarget;
+    const panelKey = canvas && canvas.dataset ? canvas.dataset.panelViewKey : null;
+    const panelView = panelKey ? state.panelViews[panelKey] : null;
+    if (!panelView) return;
+
+    if (panelView.pointerId !== null && canvas && typeof canvas.releasePointerCapture === 'function') {
+      try {
+        canvas.releasePointerCapture(panelView.pointerId);
+      } catch (err) {
+        // Ignore release errors if capture was already lost.
+      }
+    }
+
+    panelView.isDragging = false;
+    panelView.pointerId = null;
+    applyPanelViewTransform(panelView);
+  }
+
+  function onPanelWheel(event) {
+    const canvas = event.currentTarget;
+    const panelKey = canvas && canvas.dataset ? canvas.dataset.panelViewKey : null;
+    const panelView = panelKey ? getPanelView(panelKey) : null;
+    if (!panelView) return;
+
+    event.preventDefault();
+
+    if (event.ctrlKey || event.metaKey) {
+      const zoomFactor = Math.exp(-event.deltaY * 0.0015);
+      const nextZoom = panelView.zoom * zoomFactor;
+      zoomPanelView(panelView, nextZoom, event.clientX, event.clientY);
+      return;
+    }
+
+    panPanelView(panelView, -event.deltaX, -event.deltaY);
+  }
+
+  function onPanelDoubleClick(event) {
+    const canvas = event.currentTarget;
+    const panelKey = canvas && canvas.dataset ? canvas.dataset.panelViewKey : null;
+    if (!panelKey) return;
+
+    resetPanelView(panelKey);
+  }
+
+  function createPanelTools(panelKey) {
+    const panelView = getPanelView(panelKey);
+    const tools = document.createElement('div');
+    tools.className = 'visualizer-stage-tools';
+
+    const zoomLabel = document.createElement('span');
+    zoomLabel.className = 'visualizer-stage-zoom';
+    zoomLabel.textContent = '100%';
+
+    const resetButton = document.createElement('button');
+    resetButton.type = 'button';
+    resetButton.className = 'visualizer-stage-reset';
+    resetButton.textContent = 'Reset';
+    resetButton.title = 'Reset zoom and pan';
+    resetButton.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      resetPanelView(panelKey);
+    });
+
+    tools.append(zoomLabel, resetButton);
+    panelView.zoomLabel = zoomLabel;
+    panelView.resetButton = resetButton;
+    return tools;
+  }
+
+  function syncMountedPanelView(panelKey, canvas) {
+    const panelView = getPanelView(panelKey);
+    panelView.canvas = canvas;
+    if (canvas) {
+      canvas.dataset.panelViewKey = panelKey;
+      canvas.title = PANEL_VIEW_TOOLTIPS[panelKey] || 'Wheel or Ctrl+wheel to zoom. Drag to pan. Double-click to reset.';
+      canvas.style.touchAction = 'none';
+      canvas.style.transformOrigin = '0 0';
+      canvas.style.willChange = 'transform';
+      canvas.style.cursor = panelView.isDragging ? 'grabbing' : 'grab';
+    }
+
+    applyPanelViewTransform(panelView);
+  }
+
+  function bindPanelInteractions(panel) {
+    if (!panel) return;
+
+    PANEL_VIEW_KEYS.forEach((panelKey) => {
+      const stage = panel.querySelector(`.visualizer-stage-${panelKey}`);
+      const canvas = stage ? stage.querySelector(`[data-role="${panelKey}-canvas"]`) : null;
+      if (!stage || !canvas) return;
+
+      const header = stage.querySelector('.visualizer-stage-header');
+      if (header && !header.querySelector('.visualizer-stage-tools')) {
+        header.append(createPanelTools(panelKey));
+      }
+
+      const panelView = getPanelView(panelKey);
+      panelView.stage = stage;
+      panelView.header = header;
+      syncMountedPanelView(panelKey, canvas);
+
+      if (canvas.dataset.zoomPanBound === 'true') return;
+      canvas.dataset.zoomPanBound = 'true';
+      canvas.addEventListener('pointerdown', onPanelPointerDown);
+      canvas.addEventListener('pointermove', onPanelPointerMove);
+      canvas.addEventListener('pointerup', endPanelPointerDrag);
+      canvas.addEventListener('pointercancel', endPanelPointerDrag);
+      canvas.addEventListener('lostpointercapture', endPanelPointerDrag);
+      canvas.addEventListener('wheel', onPanelWheel, { passive: false });
+      canvas.addEventListener('dblclick', onPanelDoubleClick);
+    });
+  }
+
+  function syncPanelViewTransforms() {
+    PANEL_VIEW_KEYS.forEach((panelKey) => {
+      const panelView = state.panelViews[panelKey];
+      if (panelView && panelView.canvas) {
+        applyPanelViewTransform(panelView);
+      }
+    });
   }
 
   function noteLabelToMidi(noteLabel) {
@@ -463,9 +782,8 @@
   function setCanvasSize(canvas) {
     if (!canvas) return null;
 
-    const rect = canvas.getBoundingClientRect();
-    const cssWidth = Math.max(1, Math.floor(rect.width));
-    const cssHeight = Math.max(1, Math.floor(rect.height));
+    const cssWidth = Math.max(1, Math.floor(canvas.offsetWidth || canvas.clientWidth || 0));
+    const cssHeight = Math.max(1, Math.floor(canvas.offsetHeight || canvas.clientHeight || 0));
     if (!cssWidth || !cssHeight) return null;
 
     const dpr = window.devicePixelRatio || 1;
@@ -1189,6 +1507,8 @@
   }
 
   function drawFrame(frame) {
+    syncPanelViewTransforms();
+
     if (state.spectrumCanvas) {
       const spectrumSize = setCanvasSize(state.spectrumCanvas);
       if (spectrumSize) drawSpectrum(spectrumSize.ctx, spectrumSize.width, spectrumSize.height, frame);
@@ -1334,6 +1654,8 @@
     state.timelineCtx = state.timelineCanvas ? state.timelineCanvas.getContext('2d') : null;
     state.summaryCtx = state.summaryCanvas ? state.summaryCanvas.getContext('2d') : null;
 
+    bindPanelInteractions(panel);
+
     drawFrame(state.latestFrame);
     startRenderLoop();
   }
@@ -1357,6 +1679,27 @@
     state.mfccCtx = null;
     state.timelineCtx = null;
     state.summaryCtx = null;
+
+    PANEL_VIEW_KEYS.forEach((panelKey) => {
+      const panelView = state.panelViews[panelKey];
+      if (!panelView) return;
+
+      if (panelView.canvas) {
+        panelView.canvas.style.transform = '';
+        panelView.canvas.style.cursor = '';
+        panelView.canvas.style.willChange = '';
+        panelView.canvas.dataset.zoomPanBound = 'false';
+        delete panelView.canvas.dataset.panelViewKey;
+      }
+
+      panelView.canvas = null;
+      panelView.stage = null;
+      panelView.header = null;
+      panelView.resetButton = null;
+      panelView.zoomLabel = null;
+      panelView.isDragging = false;
+      panelView.pointerId = null;
+    });
 
     if (!state.sessionActive) {
       stopRenderLoop();
