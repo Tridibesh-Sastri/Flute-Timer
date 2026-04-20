@@ -13,6 +13,35 @@ window.sessions = loadStoredSessions();
 window.expandedSessionIds = new Set();
 window.currentSessionIndex = -1;
 
+window.appendSessionNoteEvent = function(noteEvent) {
+    if (!noteEvent || !window.currentSession) return false;
+
+    if (!Array.isArray(window.currentSession.notes)) {
+        window.currentSession.notes = [];
+    }
+
+    window.currentSession.notes.push(noteEvent);
+    if (window.currentSessionIndex >= 0 && window.sessions[window.currentSessionIndex]) {
+        window.sessions[window.currentSessionIndex] = window.currentSession;
+    }
+
+    return true;
+};
+
+window.resetPsychoacousticState = function() {
+    if (typeof window.latestNoteTimeline !== 'undefined') {
+        window.latestNoteTimeline = [];
+    }
+
+    if (typeof window.latestPsychoacousticFrame !== 'undefined') {
+        window.latestPsychoacousticFrame = null;
+    }
+
+    if (typeof window.clearPsychoacousticState === 'function') {
+        window.clearPsychoacousticState();
+    }
+};
+
 let sessionStartTime = 0;
 let sessionAnimationFrame = null;
 
@@ -60,6 +89,9 @@ function toggleSession() {
   if (!window.isSessionActive) {
     // Start
     window.isSessionActive = true;
+    if (typeof window.resetPsychoacousticState === 'function') {
+        window.resetPsychoacousticState();
+    }
     if (typeof window.clearVisualizerFrame === 'function') {
         window.clearVisualizerFrame();
     }
@@ -114,6 +146,10 @@ function toggleSession() {
 
         if (window.electronAPI && window.electronAPI.notifyDashboard) {
                 window.electronAPI.notifyDashboard();
+        }
+
+        if (typeof window.resetPsychoacousticState === 'function') {
+            window.resetPsychoacousticState();
         }
   }
 }

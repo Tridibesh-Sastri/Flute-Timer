@@ -493,3 +493,127 @@ Changes Made: Created the ordered Phase 5 execution plan covering MFCC extractio
 Issues Found: None
 Fix Applied: N/A
 Result: Success
+
+
+[Iteration 42]
+Command: Phase 5 Implementation Step 1 - MFCC Extraction
+Files Modified:
+- app/renderer/audio.js
+Changes Made: Added shared MFCC buffers, Mel filter-bank/DCT helpers, and frame-level MFCC coefficient extraction from the existing FFT magnitude frame.
+Issues Found: MFCC consistency initially compared the current frame against itself after the history write.
+Fix Applied: Switched the consistency check to the previous history slot so the frame-to-frame similarity score remains meaningful.
+Result: Success
+
+
+[Iteration 43]
+Command: Phase 5 Implementation Step 2 - Frequency Mapping
+Files Modified:
+- app/renderer/audio.js
+Changes Made: Added HPS frequency to MIDI/note mapping helpers and exposed the mapped note as both MIDI and label data on the live frame snapshot.
+Issues Found: None
+Fix Applied: N/A
+Result: Success
+
+
+[Iteration 44]
+Command: Phase 5 Implementation Step 3 - Pitch Binning
+Files Modified:
+- app/renderer/audio.js
+Changes Made: Added the short MIDI smoothing window and median-based pitch bin selection to reduce semitone jitter.
+Issues Found: None
+Fix Applied: N/A
+Result: Success
+
+
+[Iteration 45]
+Command: Phase 5 Implementation Step 4 - Temporal Smoothing
+Files Modified:
+- app/renderer/audio.js
+Changes Made: Added the 3 to 5 frame smoothing window, temporal stability scoring, and note-confidence rollup for stable note promotion.
+Issues Found: None
+Fix Applied: N/A
+Result: Success
+
+
+[Iteration 46]
+Command: Phase 5 Implementation Step 5 - Noise Rejection
+Files Modified:
+- app/renderer/audio.js
+Changes Made: Added frame rejection for low amplitude, unstable HPS agreement, and MFCC inconsistency while keeping the last valid note state alive.
+Issues Found: None
+Fix Applied: N/A
+Result: Success
+
+
+[Iteration 47]
+Command: Phase 5 Implementation Step 6 - Note Segmentation
+Files Modified:
+- app/renderer/audio.js
+Changes Made: Added active/pending stable-note tracking and finalized NoteEvents only when the stable note survives the minimum frame/duration window or changes.
+Issues Found: None
+Fix Applied: N/A
+Result: Success
+
+
+[Iteration 48]
+Command: Phase 5 Implementation Step 7 - Note Timeline Buffer
+Files Modified:
+- app/renderer/audio.js
+- app/components/sessionTimer.js
+Changes Made: Added the per-session note timeline buffer, session-bound note commit helper, and session reset hooks for clearing psychoacoustic state.
+Issues Found: None
+Fix Applied: N/A
+Result: Success
+
+
+[Iteration 49]
+Command: Phase 5 Implementation Step 8 - Session Integration
+Files Modified:
+- app/renderer/audio.js
+- app/components/sessionTimer.js
+Changes Made: Hooked note commits into the active Session object through the existing session lifecycle and kept persistence on the same window/session store.
+Issues Found: None
+Fix Applied: N/A
+Result: Success
+
+
+[Iteration 50]
+Command: Phase 5 Implementation Step 9 - Debug Output
+Files Modified:
+- app/renderer/audio.js
+Changes Made: Extended the live readout with rawFrequency, hpsFrequency, mfccCoefficients, mappedNote, stableNote, confidence, and supporting frame metadata.
+Issues Found: None
+Fix Applied: N/A
+Result: Success
+
+
+[Iteration 51]
+Command: Phase 5 Implementation Step 10 - Performance Optimization
+Files Modified:
+- app/renderer/audio.js
+- app/components/sessionTimer.js
+Changes Made: Reused typed arrays and frame snapshots, avoided per-frame buffer allocation, and kept the psychoacoustic work inside the existing audio.js frame loop.
+Issues Found: None
+Fix Applied: N/A
+Result: Success
+
+
+[Iteration 52]
+Command: Phase 5 Implementation Step 11 - Final System Test
+Files Modified:
+- app/renderer/audio.js
+- app/components/sessionTimer.js
+Changes Made: Ran `npm start` from the project root after the psychoacoustic implementation and verified Electron launched successfully.
+Issues Found: Electron printed Windows cache-access warnings during startup.
+Fix Applied: None required; the warnings did not prevent app startup.
+Result: Success / Startup Verified
+
+
+[Iteration 53]
+Command: Phase 5.2 Accuracy Calibration & Refinement
+Files Modified:
+- app/renderer/audio.js
+Changes Made: Added octave-error correction from the shared FFT frame, adaptive 3-to-5 frame smoothing, weighted HPS/MFCC/amplitude confidence fusion, transition-aware note promotion, and live debug fields for octave-corrected frequency, window size, transition state, and lock state. Kept the single analyser path and existing note persistence flow intact.
+Issues Found: None
+Fix Applied: N/A
+Result: Success / Startup Verified

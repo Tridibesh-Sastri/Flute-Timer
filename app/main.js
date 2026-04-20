@@ -73,7 +73,8 @@ function createFloatingWidget() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
-      contextIsolation: true
+      contextIsolation: true,
+      backgroundThrottling: false
     }
   });
   floatingWidget.loadFile(path.join(__dirname, 'renderer', 'index.html'));
@@ -100,7 +101,8 @@ function createDashboard() {
     webPreferences: {
       preload: path.join(__dirname, 'dashboard', 'dashboard_preload.js'),
       nodeIntegration: false,
-      contextIsolation: true
+      contextIsolation: true,
+      backgroundThrottling: false
     }
   });
   dashboardWindow.loadFile(path.join(__dirname, 'dashboard', 'dashboard.html'));

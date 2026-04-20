@@ -57,7 +57,324 @@ function getSessionKey(session, index) {
   return session.id || `session-${index}`;
 }
 
+const VISUALIZER_PANEL_SIZES_KEY = 'panelSizes';
+const DEFAULT_VISUALIZER_PANEL_SIZES = {
+  rowHeights: [34, 33, 33],
+  columnWidths: {
+    top: 50,
+    middle: 50,
+    bottom: 50
+  }
+};
+
+let visualizerPanelSizes = loadVisualizerPanelSizes();
+let visualizerResizeObserver = null;
+let visualizerDragState = null;
+let visualizerRefreshTimer = null;
+
+function cloneDefaultVisualizerPanelSizes() {
+  return {
+    rowHeights: [...DEFAULT_VISUALIZER_PANEL_SIZES.rowHeights],
+    columnWidths: { ...DEFAULT_VISUALIZER_PANEL_SIZES.columnWidths }
+  };
+}
+
+function clampNumber(value, minimum, maximum) {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) return minimum;
+  return Math.min(maximum, Math.max(minimum, numericValue));
+}
+
+function normalizeRowHeights(rowHeights) {
+  const fallback = [...DEFAULT_VISUALIZER_PANEL_SIZES.rowHeights];
+  if (!Array.isArray(rowHeights) || rowHeights.length !== 3) {
+    return fallback;
+  }
+
+  const values = rowHeights.map((value) => {
+    const numericValue = Number(value);
+    return Number.isFinite(numericValue) && numericValue > 0 ? numericValue : 0;
+  });
+  const total = values.reduce((sum, value) => sum + value, 0);
+  if (!total) return fallback;
+
+  return values.map((value) => Math.round((value / total) * 10000) / 100);
+}
+
+function normalizeColumnWidths(columnWidths) {
+  const fallback = { ...DEFAULT_VISUALIZER_PANEL_SIZES.columnWidths };
+  if (!columnWidths || typeof columnWidths !== 'object') {
+    return fallback;
+  }
+
+  return {
+    top: clampNumber(columnWidths.top, 20, 80),
+    middle: clampNumber(columnWidths.middle, 20, 80),
+    bottom: clampNumber(columnWidths.bottom, 20, 80)
+  };
+}
+
+function loadVisualizerPanelSizes() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(VISUALIZER_PANEL_SIZES_KEY));
+    if (!parsed || typeof parsed !== 'object') {
+      return cloneDefaultVisualizerPanelSizes();
+    }
+
+    return {
+      rowHeights: normalizeRowHeights(parsed.rowHeights),
+      columnWidths: normalizeColumnWidths(parsed.columnWidths)
+    };
+  } catch (err) {
+    return cloneDefaultVisualizerPanelSizes();
+  }
+}
+
+function saveVisualizerPanelSizes() {
+  localStorage.setItem(VISUALIZER_PANEL_SIZES_KEY, JSON.stringify(visualizerPanelSizes));
+}
+
+function requestVisualizerRefresh() {
+  if (visualizerRefreshTimer) return;
+
+  visualizerRefreshTimer = window.setTimeout(() => {
+    visualizerRefreshTimer = null;
+    if (typeof window.refreshVisualizerLayout === 'function') {
+      window.refreshVisualizerLayout();
+    }
+  }, 16);
+}
+
+function observeVisualizerContainer(container) {
+  if (!container || typeof ResizeObserver === 'undefined') return;
+
+  if (visualizerResizeObserver) {
+    visualizerResizeObserver.disconnect();
+  }
+
+  visualizerResizeObserver = new ResizeObserver(() => {
+    requestVisualizerRefresh();
+  });
+  visualizerResizeObserver.observe(container);
+}
+
+function applyVisualizerPanelSizes(container) {
+  if (!container) return;
+
+  container.style.setProperty('--visualizer-row-1', `${visualizerPanelSizes.rowHeights[0]}fr`);
+  container.style.setProperty('--visualizer-row-2', `${visualizerPanelSizes.rowHeights[1]}fr`);
+  container.style.setProperty('--visualizer-row-3', `${visualizerPanelSizes.rowHeights[2]}fr`);
+
+  const rows = Array.from(container.querySelectorAll('.dashboard-row'));
+  rows.forEach((row, index) => {
+    const panels = Array.from(row.querySelectorAll('.panel'));
+    if (panels.length < 2) return;
+
+    const columnKey = index === 0 ? 'top' : index === 1 ? 'middle' : 'bottom';
+    const leftWidth = visualizerPanelSizes.columnWidths[columnKey];
+    const rightWidth = 100 - leftWidth;
+
+    panels[0].style.flex = `${leftWidth} 1 0%`;
+    panels[1].style.flex = `${rightWidth} 1 0%`;
+  });
+}
+
+function teardownVisualizerWorkspace() {
+  if (visualizerResizeObserver) {
+    visualizerResizeObserver.disconnect();
+    visualizerResizeObserver = null;
+  }
+
+  if (visualizerRefreshTimer) {
+    window.clearTimeout(visualizerRefreshTimer);
+    visualizerRefreshTimer = null;
+  }
+
+  visualizerDragState = null;
+  if (document.body) {
+    document.body.classList.remove('dashboard-resizing');
+  }
+}
+
+function attachSplitterHandlers(container) {
+  if (!container) return;
+
+  container.querySelectorAll('.splitter').forEach((splitter) => {
+    if (splitter.dataset.bound === 'true') return;
+    splitter.dataset.bound = 'true';
+    splitter.addEventListener('mousedown', beginSplitterDrag);
+  });
+}
+
+function buildVisualizerWorkspace() {
+  const container = document.getElementById('visualizer-container');
+  if (!container) return false;
+
+  const rows = container.querySelectorAll('.dashboard-row');
+  if (rows.length === 3) {
+    applyVisualizerPanelSizes(container);
+    attachSplitterHandlers(container);
+    observeVisualizerContainer(container);
+    return true;
+  }
+
+  const stages = Array.from(container.querySelectorAll('.visualizer-stage'));
+  if (stages.length < 6) return false;
+
+  const fragment = document.createDocumentFragment();
+
+  for (let rowIndex = 0; rowIndex < 3; rowIndex++) {
+    const row = document.createElement('div');
+    row.className = 'dashboard-row';
+    row.dataset.rowIndex = String(rowIndex);
+
+    const leftPanel = stages[rowIndex * 2];
+    const rightPanel = stages[rowIndex * 2 + 1];
+    leftPanel.classList.add('panel');
+    rightPanel.classList.add('panel');
+
+    const verticalSplitter = document.createElement('div');
+    verticalSplitter.className = 'splitter vertical';
+    verticalSplitter.dataset.bound = 'false';
+    verticalSplitter.dataset.rowIndex = String(rowIndex);
+
+    row.append(leftPanel, verticalSplitter, rightPanel);
+    fragment.append(row);
+
+    if (rowIndex < 2) {
+      const horizontalSplitter = document.createElement('div');
+      horizontalSplitter.className = 'splitter horizontal';
+      horizontalSplitter.dataset.bound = 'false';
+      horizontalSplitter.dataset.rowIndex = String(rowIndex);
+      fragment.append(horizontalSplitter);
+    }
+  }
+
+  container.replaceChildren(fragment);
+  applyVisualizerPanelSizes(container);
+  attachSplitterHandlers(container);
+  observeVisualizerContainer(container);
+  requestVisualizerRefresh();
+  return true;
+}
+
+function beginSplitterDrag(event) {
+  if (event.button !== 0) return;
+
+  const splitter = event.currentTarget;
+  const container = document.getElementById('visualizer-container');
+  if (!splitter || !container) return;
+
+  visualizerDragState = {
+    splitter,
+    container,
+    axis: splitter.classList.contains('vertical') ? 'vertical' : 'horizontal'
+  };
+
+  if (document.body) {
+    document.body.classList.add('dashboard-resizing');
+  }
+
+  event.preventDefault();
+}
+
+function handleSplitterMouseMove(event) {
+  if (!visualizerDragState) return;
+
+  const { splitter, container, axis } = visualizerDragState;
+
+  if (axis === 'vertical') {
+    const row = splitter.parentElement;
+    const leftPanel = splitter.previousElementSibling;
+    const rightPanel = splitter.nextElementSibling;
+    if (!row || !leftPanel || !rightPanel) return;
+
+    const rowIndex = Number(row.dataset.rowIndex);
+    const leftRect = leftPanel.getBoundingClientRect();
+    const rightRect = rightPanel.getBoundingClientRect();
+    const pairWidth = leftRect.width + rightRect.width;
+    if (pairWidth <= 0) return;
+
+    const minimum = 20;
+    const maximum = 100 - minimum;
+    const nextLeftWidth = clampNumber(event.clientX - leftRect.left, (minimum / 100) * pairWidth, pairWidth - ((minimum / 100) * pairWidth));
+    const nextLeftPercent = clampNumber((nextLeftWidth / pairWidth) * 100, minimum, maximum);
+
+    if (rowIndex === 0) visualizerPanelSizes.columnWidths.top = nextLeftPercent;
+    if (rowIndex === 1) visualizerPanelSizes.columnWidths.middle = nextLeftPercent;
+    if (rowIndex === 2) visualizerPanelSizes.columnWidths.bottom = nextLeftPercent;
+  }
+
+  if (axis === 'horizontal') {
+    const topRow = splitter.previousElementSibling;
+    const bottomRow = splitter.nextElementSibling;
+    if (!topRow || !bottomRow) return;
+
+    const topIndex = Number(topRow.dataset.rowIndex);
+    const bottomIndex = Number(bottomRow.dataset.rowIndex);
+    const topRect = topRow.getBoundingClientRect();
+    const bottomRect = bottomRow.getBoundingClientRect();
+    const pairHeight = topRect.height + bottomRect.height;
+    if (pairHeight <= 0) return;
+
+    const pairSum = visualizerPanelSizes.rowHeights[topIndex] + visualizerPanelSizes.rowHeights[bottomIndex];
+    const minimum = 15;
+    const maximum = Math.max(minimum, pairSum - minimum);
+    const nextTopHeight = clampNumber(event.clientY - topRect.top, (minimum / 100) * pairHeight, pairHeight - ((minimum / 100) * pairHeight));
+    const nextTopPercent = clampNumber((nextTopHeight / pairHeight) * pairSum, minimum, maximum);
+
+    visualizerPanelSizes.rowHeights[topIndex] = nextTopPercent;
+    visualizerPanelSizes.rowHeights[bottomIndex] = pairSum - nextTopPercent;
+  }
+
+  applyVisualizerPanelSizes(container);
+  saveVisualizerPanelSizes();
+  requestVisualizerRefresh();
+}
+
+function handleSplitterMouseUp() {
+  if (!visualizerDragState) return;
+
+  visualizerDragState = null;
+  if (document.body) {
+    document.body.classList.remove('dashboard-resizing');
+  }
+
+  saveVisualizerPanelSizes();
+  requestVisualizerRefresh();
+}
+
+document.addEventListener('mousemove', handleSplitterMouseMove);
+document.addEventListener('mouseup', handleSplitterMouseUp);
+document.addEventListener('mouseleave', handleSplitterMouseUp);
+
 // ─── Tab Navigation ───────────────────────────────────────────
+function syncVisualizerPanelState() {
+  const visualizerPanel = document.getElementById('panel-visualizer');
+  const visualizerContainer = document.getElementById('visualizer-container');
+  if (!visualizerPanel || !visualizerContainer) return;
+
+  const isActive = visualizerPanel.classList.contains('active');
+  if (isActive) {
+    if (visualizerContainer.childElementCount === 0 && typeof window.mountVisualizer === 'function') {
+      window.mountVisualizer('visualizer-container');
+    }
+
+    buildVisualizerWorkspace();
+
+    if (typeof window.refreshVisualizerLayout === 'function') {
+      window.refreshVisualizerLayout();
+    }
+
+    return;
+  }
+
+  teardownVisualizerWorkspace();
+  if (typeof window.unmountVisualizer === 'function') {
+    window.unmountVisualizer();
+  }
+}
+
 function initTabs() {
   const tabs = document.querySelectorAll('.tab-btn');
   const panels = document.querySelectorAll('.tab-panel');
@@ -69,9 +386,7 @@ function initTabs() {
       const targetPanel = document.getElementById(tab.dataset.tab);
       if (targetPanel) targetPanel.classList.add('active');
 
-      if (targetPanel && targetPanel.id === 'panel-visualizer' && typeof window.refreshVisualizerLayout === 'function') {
-        window.refreshVisualizerLayout();
-      }
+      syncVisualizerPanelState();
     });
   });
 }
@@ -322,8 +637,8 @@ function renderDashboard() {
   if (window.renderAnalytics) window.renderAnalytics('panel-summary', sessions);
   if (window.renderCalendar) window.renderCalendar('panel-calendar', sessions);
   renderSessionsTab(sessions);
-  if (window.renderVisualizer) window.renderVisualizer('panel-visualizer');
   renderSettingsTab();
+  syncVisualizerPanelState();
 }
 
 // ─── Init ─────────────────────────────────────────────────────
@@ -354,7 +669,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (api && api.onVisualizerFrame) {
     api.onVisualizerFrame((frame) => {
-      window.latestDashboardVisualizerFrame = frame || null;
       if (typeof window.updateVisualizerFrame === 'function') {
         window.updateVisualizerFrame(frame);
       }
