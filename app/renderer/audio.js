@@ -26,13 +26,16 @@ const MIN_PITCH_WINDOW_SIZE = 3;
 const MAX_PITCH_WINDOW_SIZE = 5;
 const NOTE_LOCK_CONFIDENCE_THRESHOLD = 0.7;
 const TRANSITION_CONFIDENCE_THRESHOLD = 0.62;
-const TRANSITION_SEMITONE_THRESHOLD = 1.5;
+const TRANSITION_SEMITONE_THRESHOLD = 1;
 const MIN_FRAME_CONFIDENCE = 0.42;
 const MIN_DOMINANT_PEAK_RATIO = 1.25;
 const OCTAVE_CORRECTION_SCORE_MARGIN = 0.08;
 const HPS_STABILITY_WEIGHT = 0.45;
 const MFCC_STABILITY_WEIGHT = 0.35;
 const AMPLITUDE_STABILITY_WEIGHT = 0.2;
+const FAST_MODE_PROMOTION_FRAMES = 2;
+const FAST_MODE_PROMOTION_DURATION_MS = 48;
+const FAST_MODE_IMMEDIATE_CONFIDENCE_THRESHOLD = 0.84;
 
 let isRecording = false;
 let silenceStartTime = 0;
@@ -180,6 +183,37 @@ function createPitchTrackingState() {
   };
 }
 
+function resetPitchTrackingState(tracking) {
+  if (!tracking) {
+    return createPitchTrackingState();
+  }
+
+  tracking.active = false;
+  tracking.noteLabel = '';
+  tracking.noteName = '';
+  tracking.octave = null;
+  tracking.midiValue = null;
+  tracking.startTimeMs = 0;
+  tracking.startTimeIso = '';
+  tracking.lastFrameTimeMs = 0;
+  tracking.frequencySum = 0;
+  tracking.frequencySquaredSum = 0;
+  tracking.frequencyCount = 0;
+  tracking.detectedNotes.length = 0;
+  tracking.seenNotes.clear();
+  tracking.noteCounts.clear();
+  tracking.confidenceTotals.clear();
+  tracking.firstSeenOrder.clear();
+  tracking.nextOrder = 0;
+  tracking.frameCount = 0;
+  tracking.hpsAgreementSum = 0;
+  tracking.mfccConsistencySum = 0;
+  tracking.temporalStabilitySum = 0;
+  tracking.noteConfidenceSum = 0;
+
+  return tracking;
+}
+
 function createPsychoacousticState(sampleRate, fftSize, binCount) {
   const mfccMelEnergies = new Float32Array(MFCC_FILTER_COUNT);
   const mfccLogEnergies = new Float32Array(MFCC_FILTER_COUNT);
@@ -262,6 +296,7 @@ function createPsychoacousticState(sampleRate, fftSize, binCount) {
       windowSize: PITCH_WINDOW_SIZE,
       transitionDetected: false,
       noteLocked: false,
+      detectionMode: 'stable',
       mfccCoefficients,
       mappedNote: {
         midiValue: null,
@@ -300,7 +335,7 @@ function initializePsychoacousticState() {
   psychoacousticState = createPsychoacousticState(audioCtx.sampleRate, analyser.fftSize, pitchSpectrumBuffer.length);
   window.latestPsychoacousticFrame = psychoacousticState.latestFrame;
   window.latestNoteTimeline = psychoacousticState.noteTimeline;
-  pendingPitchTracking = createPitchTrackingState();
+  pendingPitchTracking = resetPitchTrackingState(pendingPitchTracking);
   resetActivePitchTracking();
 }
 
@@ -308,7 +343,7 @@ function resetPsychoacousticState() {
   if (!psychoacousticState) {
     window.latestPsychoacousticFrame = null;
     window.latestNoteTimeline = [];
-    pendingPitchTracking = createPitchTrackingState();
+    pendingPitchTracking = resetPitchTrackingState(pendingPitchTracking);
     resetActivePitchTracking();
     return;
   }
@@ -332,6 +367,7 @@ function resetPsychoacousticState() {
   psychoacousticState.latestFrame.windowSize = PITCH_WINDOW_SIZE;
   psychoacousticState.latestFrame.transitionDetected = false;
   psychoacousticState.latestFrame.noteLocked = false;
+  psychoacousticState.latestFrame.detectionMode = 'stable';
   psychoacousticState.latestFrame.mappedMidiValue = null;
   psychoacousticState.latestFrame.stableMidi = null;
   psychoacousticState.latestFrame.stableFrequency = null;
@@ -354,7 +390,7 @@ function resetPsychoacousticState() {
   psychoacousticState.latestFrame.stableNote.noteLabel = '';
   psychoacousticState.latestFrame.stableNote.noteName = '';
   psychoacousticState.latestFrame.stableNote.octave = null;
-  pendingPitchTracking = createPitchTrackingState();
+  pendingPitchTracking = resetPitchTrackingState(pendingPitchTracking);
   resetActivePitchTracking();
   window.latestPsychoacousticFrame = psychoacousticState.latestFrame;
   window.latestNoteTimeline = psychoacousticState.noteTimeline;
@@ -517,8 +553,8 @@ function calculateFrameFusionConfidence(hpsStability, mfccConsistency, amplitude
   );
 }
 
-function resolveAdaptiveWindowSize(frameConfidence, transitionDetected, noteLocked) {
-  if (transitionDetected) {
+function resolveAdaptiveWindowSize(frameConfidence, detectionMode, noteLocked) {
+  if (detectionMode === 'fast') {
     return MIN_PITCH_WINDOW_SIZE;
   }
 
@@ -535,6 +571,22 @@ function resolveAdaptiveWindowSize(frameConfidence, transitionDetected, noteLock
   }
 
   return MIN_PITCH_WINDOW_SIZE;
+}
+
+function resolvePromotionPolicy(detectionMode) {
+  if (detectionMode === 'fast') {
+    return {
+      minFrames: FAST_MODE_PROMOTION_FRAMES,
+      minDurationMs: FAST_MODE_PROMOTION_DURATION_MS,
+      immediateConfidenceThreshold: FAST_MODE_IMMEDIATE_CONFIDENCE_THRESHOLD
+    };
+  }
+
+  return {
+    minFrames: MIN_STABLE_NOTE_FRAMES,
+    minDurationMs: MIN_STABLE_NOTE_DURATION_MS,
+    immediateConfidenceThreshold: NOTE_LOCK_CONFIDENCE_THRESHOLD
+  };
 }
 
 function analyzePitchFrame(rms, minimumRms = window.START_THRESHOLD) {
@@ -923,14 +975,15 @@ function promotePendingPitchTrackingToActive() {
     return null;
   }
 
+  const previousActive = activePitchTracking;
   activePitchTracking = pendingPitchTracking;
   activePitchTracking.active = true;
-  pendingPitchTracking = createPitchTrackingState();
+  pendingPitchTracking = resetPitchTrackingState(previousActive);
   return activePitchTracking;
 }
 
 function clearPendingPitchTracking() {
-  pendingPitchTracking = createPitchTrackingState();
+  pendingPitchTracking = resetPitchTrackingState(pendingPitchTracking);
 }
 
 function resetPitchWindowState() {
@@ -968,7 +1021,7 @@ function commitFinalizedNoteEvent(noteEvent) {
 
 function finalizeAndCommitActiveNote(endTimeMs) {
   const finalizedNote = finalizePitchTracking(activePitchTracking, endTimeMs);
-  activePitchTracking = createPitchTrackingState();
+  activePitchTracking = resetPitchTrackingState(activePitchTracking);
   resetPitchWindowState();
 
   if (!finalizedNote) {
@@ -1026,6 +1079,7 @@ function updatePsychoacousticTracking(rawPitchAnalysis, filteredPitchAnalysis, c
   frame.windowSize = PITCH_WINDOW_SIZE;
   frame.transitionDetected = false;
   frame.noteLocked = false;
+  frame.detectionMode = 'stable';
   frame.mappedNote.midiValue = null;
   frame.mappedNote.noteLabel = '';
   frame.mappedNote.noteName = '';
@@ -1106,8 +1160,10 @@ function updatePsychoacousticTracking(rawPitchAnalysis, filteredPitchAnalysis, c
     Math.abs(mappedNote.midiValue - activePitchTracking.midiValue) >= TRANSITION_SEMITONE_THRESHOLD &&
     transitionConfidence >= TRANSITION_CONFIDENCE_THRESHOLD
   );
+  const detectionMode = transitionDetected ? 'fast' : 'stable';
+  const promotionPolicy = resolvePromotionPolicy(detectionMode);
   const noteLockCandidate = Boolean(candidateMatchesActive && frameConfidence >= NOTE_LOCK_CONFIDENCE_THRESHOLD);
-  const windowSize = resolveAdaptiveWindowSize(frameConfidence, transitionDetected, noteLockCandidate);
+  const windowSize = resolveAdaptiveWindowSize(frameConfidence, detectionMode, noteLockCandidate);
 
   if (transitionDetected) {
     resetPitchWindowState();
@@ -1133,6 +1189,7 @@ function updatePsychoacousticTracking(rawPitchAnalysis, filteredPitchAnalysis, c
   frame.windowSize = stableWindow.windowSize;
   frame.transitionDetected = transitionDetected;
   frame.noteLocked = noteLocked;
+  frame.detectionMode = detectionMode;
   frame.noteConfidence = noteConfidence;
   frame.confidence = frameConfidence;
   frame.accepted = accepted;
@@ -1197,7 +1254,7 @@ function updatePsychoacousticTracking(rawPitchAnalysis, filteredPitchAnalysis, c
     clearPendingPitchTracking();
   } else {
     if (!pendingPitchTracking || pendingPitchTracking.noteLabel !== currentCandidate.noteLabel) {
-      pendingPitchTracking = createPitchTrackingState();
+      pendingPitchTracking = resetPitchTrackingState(pendingPitchTracking);
       pendingPitchTracking.noteLabel = currentCandidate.noteLabel;
       pendingPitchTracking.noteName = currentCandidate.noteName;
       pendingPitchTracking.octave = currentCandidate.octave;
@@ -1216,16 +1273,15 @@ function updatePsychoacousticTracking(rawPitchAnalysis, filteredPitchAnalysis, c
     }, frame);
 
     const pendingDurationMs = frameTimeMs - pendingPitchTracking.startTimeMs;
-    const shouldPromoteImmediately = transitionDetected && transitionConfidence >= NOTE_LOCK_CONFIDENCE_THRESHOLD;
-    if ((pendingPitchTracking.frameCount >= MIN_STABLE_NOTE_FRAMES && pendingDurationMs >= MIN_STABLE_NOTE_DURATION_MS) || shouldPromoteImmediately) {
+    const shouldPromoteImmediately = detectionMode === 'fast' && transitionDetected && transitionConfidence >= promotionPolicy.immediateConfidenceThreshold;
+    const shouldPromoteAfterConfirmation = pendingPitchTracking.frameCount >= promotionPolicy.minFrames && pendingDurationMs >= promotionPolicy.minDurationMs;
+    if (shouldPromoteAfterConfirmation || shouldPromoteImmediately) {
       if (activePitchTracking && activePitchTracking.active && activePitchTracking.noteLabel && activePitchTracking.noteLabel !== pendingPitchTracking.noteLabel) {
         finalizeAndCommitActiveNote(pendingPitchTracking.startTimeMs);
       }
 
       if (!activePitchTracking || !activePitchTracking.active || activePitchTracking.noteLabel !== pendingPitchTracking.noteLabel) {
-        activePitchTracking = pendingPitchTracking;
-        activePitchTracking.active = true;
-        pendingPitchTracking = createPitchTrackingState();
+        promotePendingPitchTrackingToActive();
       }
     }
   }
@@ -1276,6 +1332,13 @@ function publishPitchReadout(pitchAnalysis) {
   if ((now - lastPitchUiUpdateAt) < PITCH_UI_THROTTLE_MS) return;
 
   lastPitchUiUpdateAt = now;
+  const detectionMode = pitchAnalysis.detectionMode || 'stable';
+  const displayNoteLabel = detectionMode === 'fast' && pitchAnalysis.transitionDetected && pitchAnalysis.mappedNote && pitchAnalysis.mappedNote.noteLabel
+    ? pitchAnalysis.mappedNote.noteLabel
+    : (pitchAnalysis.noteLabel || (pitchAnalysis.stableNote && pitchAnalysis.stableNote.noteLabel) || '');
+  const displayFrequencyHz = detectionMode === 'fast' && pitchAnalysis.transitionDetected && Number.isFinite(pitchAnalysis.octaveCorrectedFrequencyHz)
+    ? pitchAnalysis.octaveCorrectedFrequencyHz
+    : (Number.isFinite(pitchAnalysis.frequencyHz) ? pitchAnalysis.frequencyHz : (Number.isFinite(pitchAnalysis.stableFrequency) ? pitchAnalysis.stableFrequency : null));
   const pitchReadout = {
     timestampMs: Number.isFinite(pitchAnalysis.timestampMs) ? pitchAnalysis.timestampMs : null,
     sampleRate: Number.isFinite(pitchAnalysis.sampleRate) ? pitchAnalysis.sampleRate : (audioCtx ? audioCtx.sampleRate : null),
@@ -1284,12 +1347,12 @@ function publishPitchReadout(pitchAnalysis) {
     hpsFrequency: Number.isFinite(pitchAnalysis.hpsFrequency) ? pitchAnalysis.hpsFrequency : (Number.isFinite(pitchAnalysis.hpsFrequencyHz) ? pitchAnalysis.hpsFrequencyHz : (Number.isFinite(pitchAnalysis.frequencyHz) ? pitchAnalysis.frequencyHz : null)),
     rawConfidence: Number.isFinite(pitchAnalysis.rawConfidence) ? pitchAnalysis.rawConfidence : 0,
     hpsConfidence: Number.isFinite(pitchAnalysis.hpsConfidence) ? pitchAnalysis.hpsConfidence : 0,
-    frequencyHz: pitchAnalysis.frequencyHz,
+    frequencyHz: displayFrequencyHz,
     octaveCorrectedFrequency: Number.isFinite(pitchAnalysis.octaveCorrectedFrequency) ? pitchAnalysis.octaveCorrectedFrequency : (Number.isFinite(pitchAnalysis.octaveCorrectedFrequencyHz) ? pitchAnalysis.octaveCorrectedFrequencyHz : null),
     octaveCorrectedFrequencyHz: Number.isFinite(pitchAnalysis.octaveCorrectedFrequencyHz) ? pitchAnalysis.octaveCorrectedFrequencyHz : (Number.isFinite(pitchAnalysis.octaveCorrectedFrequency) ? pitchAnalysis.octaveCorrectedFrequency : null),
     octaveCorrectedConfidence: Number.isFinite(pitchAnalysis.octaveCorrectedConfidence) ? pitchAnalysis.octaveCorrectedConfidence : 0,
     pitchConfidence: pitchAnalysis.pitchConfidence,
-    noteLabel: pitchAnalysis.noteLabel,
+    noteLabel: displayNoteLabel,
     noteName: pitchAnalysis.noteName,
     octave: pitchAnalysis.octave,
     midiNumber: pitchAnalysis.midiNumber,
@@ -1309,6 +1372,7 @@ function publishPitchReadout(pitchAnalysis) {
     windowSize: Number.isFinite(pitchAnalysis.windowSize) ? pitchAnalysis.windowSize : null,
     transitionDetected: Boolean(pitchAnalysis.transitionDetected),
     noteLocked: Boolean(pitchAnalysis.noteLocked),
+    detectionMode,
     rejectionReason: pitchAnalysis.rejectionReason || '',
     accepted: Boolean(pitchAnalysis.accepted),
     isBreathDominant: Boolean(pitchAnalysis.isBreathDominant),
@@ -1415,8 +1479,7 @@ function clearVisualizerFrame() {
 }
 
 function resetActivePitchTracking() {
-  activePitchTracking = createPitchTrackingState();
-  activePitchTracking.active = false;
+  activePitchTracking = resetPitchTrackingState(activePitchTracking);
 }
 
 function recordActivePitchSample(pitchAnalysis, psychoFrame) {
