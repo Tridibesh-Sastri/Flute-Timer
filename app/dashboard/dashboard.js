@@ -655,6 +655,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  const learningButton = document.getElementById('dash-learning-btn');
+  if (learningButton) {
+    learningButton.addEventListener('click', () => {
+      if (api && api.openLearning) api.openLearning();
+    });
+  }
+
   const minimizeButton = document.getElementById('dash-min-btn');
   const maximizeButton = document.getElementById('dash-max-btn');
   const closeButton = document.getElementById('dash-close-btn');

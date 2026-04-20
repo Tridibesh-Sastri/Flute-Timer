@@ -4,6 +4,7 @@ const path = require('path');
 
 let floatingWidget = null;
 let dashboardWindow = null;
+let learningWindow = null;
 let appSettings = { floatingOpacity: 1 };
 
 function getSettingsPath() {
@@ -110,6 +111,29 @@ function createDashboard() {
   return dashboardWindow;
 }
 
+function createLearningWindow() {
+  if (learningWindow && !learningWindow.isDestroyed()) {
+    focusWindow(learningWindow);
+    return learningWindow;
+  }
+
+  learningWindow = new BrowserWindow({
+    width: 1000,
+    height: 680,
+    minWidth: 860,
+    minHeight: 560,
+    backgroundColor: '#0b0d10',
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      backgroundThrottling: false
+    }
+  });
+  learningWindow.loadFile(path.join(__dirname, 'dashboard', 'learning.html'));
+  learningWindow.on('closed', () => { learningWindow = null; });
+  return learningWindow;
+}
+
 app.whenReady().then(() => {
   appSettings = loadSettings();
   createFloatingWidget();
@@ -118,6 +142,11 @@ app.whenReady().then(() => {
   ipcMain.on('open-dashboard', () => {
     if (dashboardWindow) focusWindow(dashboardWindow);
     else createDashboard();
+  });
+
+  ipcMain.on('open-learning', () => {
+    if (learningWindow) focusWindow(learningWindow);
+    else createLearningWindow();
   });
 
   ipcMain.on('open-floating', () => {

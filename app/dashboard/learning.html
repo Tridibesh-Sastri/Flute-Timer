@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flute Timer — Learning</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="learning.css">
+</head>
+<body>
+  <main class="learning-shell">
+    <header class="learning-header">
+      <div>
+        <div class="learning-kicker">Learning System</div>
+        <h1>Timeline Comparison</h1>
+        <p>Paste a note sequence, load it, and compare the expected notes against the current stored user timeline.</p>
+      </div>
+      <div class="learning-status-group">
+        <div id="sequence-status" class="status-chip">No sequence loaded</div>
+        <div id="latest-detected-status" class="status-chip status-chip-muted">Latest detected: —</div>
+      </div>
+    </header>
+
+    <section class="learning-grid">
+      <section class="learning-card">
+        <div class="card-heading">Learning Input</div>
+        <textarea id="learning-input" spellcheck="false" placeholder="C4 500&#10;D4 300&#10;E4 700&#10;REST 200&#10;G4 500"></textarea>
+        <div class="card-actions">
+          <button id="parse-sequence" type="button">Load Sequence</button>
+        </div>
+        <div class="card-hint">Format: one note per line, using `NOTE DURATION_MS` or `REST DURATION_MS`.</div>
+      </section>
+
+      <section class="learning-card learning-card-wide">
+        <div class="card-heading">Expected vs User Timeline</div>
+        <div class="comparison-stage">
+          <div class="timeline-label">Expected Notes</div>
+          <div id="timeline-container" class="timeline-container"></div>
+
+          <div class="timeline-label">User Notes</div>
+          <div id="user-timeline" class="timeline-container user-timeline"></div>
+
+          <div id="time-cursor" class="cursor" aria-hidden="true"></div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script src="learning.js"></script>
+</body>
+</html>
