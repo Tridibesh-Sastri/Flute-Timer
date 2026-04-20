@@ -53,3 +53,29 @@ This specification represents the universally exact boundaries of data schemas a
 - The debug frequency fields exist only for live visualization and debug surfaces.
 - Serialization layers must omit them when writing Session or NoteEvent records to storage.
 - If historical records do not contain these fields, renderers should treat them as absent without mutating the stored data.
+
+## Learning System Models
+
+### `LearningSequence` Type Structure
+- Ordered array of learning timeline entries.
+- Each entry contains `note`, `startTimeMs`, and `durationMs`.
+- `note` may be `null` to represent a rest.
+- Entries must remain sequential and non-overlapping.
+
+### `ComparisonResult` Type Structure
+- `pitchMatch`: Boolean flag indicating pitch alignment quality.
+- `timingErrorMs`: Absolute timing delta in milliseconds.
+- `durationMatch`: Boolean flag indicating duration alignment quality.
+- `confidence`: Normalized comparison confidence.
+
+### `SessionScore` Type Structure
+- `pitchAccuracy`: Normalized pitch accuracy score.
+- `timingAccuracy`: Normalized timing accuracy score.
+- `durationAccuracy`: Normalized duration accuracy score.
+- `overallScore`: Combined session score derived from the three accuracy dimensions.
+
+### Data Model Rules
+- LearningSequence is comparison input and must not be stored as detection output.
+- ComparisonResult is derived data and must not replace Session or NoteEvent records.
+- SessionScore is a derived summary and may be recomputed from the same saved inputs.
+- These learning-system models are additive and must remain compatible with existing Session and NoteEvent persistence.

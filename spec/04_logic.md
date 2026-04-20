@@ -79,3 +79,11 @@ FFT Frame → HPS frequency → MFCC coefficients → Note mapping → Smoothed 
 ## Detail View Interaction
 - Session note edits performed in the Dashboard must persist through localStorage updates without changing the computed timing fields.
 - Calendar zoom controls must only change the rendered scale of the day timeline and must never change the underlying start or end timestamps of any Session.
+
+## Learning Mode Activation
+- The application must distinguish between Free play and Learning mode at the Session level.
+- Free play Sessions may record and display note output without comparison against an expected sequence.
+- Learning mode Sessions must enable comparison against a defined LearningSequence while keeping audio detection unchanged.
+- Switching into Learning mode must not alter the Audio System detection pipeline or any note extraction rules.
+- Comparison feedback may run live during a Learning mode Session, but it must consume completed detection output rather than raw audio logic.
+
